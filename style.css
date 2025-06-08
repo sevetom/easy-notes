@@ -1,0 +1,32 @@
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.row {
+  height: calc(100vh - 56px);
+}
+
+#load-notes-input {
+  display: none;
+}
+
+#pdf-frame {
+  width: 100%;
+  height: 100%;
+  border: none;
+  overflow: auto;
+}
+
+#notes-panel {
+  height: 100%;
+  overflow-y: auto;
+  padding: 10px;
+}
+
+textarea {
+  height: 450px;
+  resize: none;
+}
