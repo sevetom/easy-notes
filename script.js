@@ -86,7 +86,7 @@ saveNotesBtn.addEventListener("click", () => {
 
   const a = document.createElement("a");
   a.href = url;
-  a.download = selectedFile + ".pdz";
+  a.download = selectedFile + ".ezn";
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
