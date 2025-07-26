@@ -11,6 +11,7 @@ Notes are independent of the document so make sure to load the correct one.
 - Take notes alongside the PDF
 - Save notes to a file
 - Load notes from a file
+- Write markdown formatted notes
 
 ## How to use
 Simply clone or download the repo and run the installation script depending on your OS:

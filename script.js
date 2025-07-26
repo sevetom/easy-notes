@@ -23,19 +23,37 @@ function createTextAreas(count, existingNotes = []) {
 
   for (let i = 1; i <= count; i++) {
     const wrapper = document.createElement("div");
+    wrapper.classList.add("mb-3");
 
     const label = document.createElement("div");
     label.classList.add("fw-bold", "text-primary", "mb-1");
-    label.textContent = `Pagina ${i}`;
+    label.textContent = `Page ${i}`;
+
+    const noteText = existingNotes[i - 1] || "";
+
+    const renderedDiv = document.createElement("div");
+    renderedDiv.classList.add("border", "p-2", "bg-light", "markdown-preview");
+    renderedDiv.innerHTML = marked.parse(noteText);
 
     const textarea = document.createElement("textarea");
-    textarea.classList.add("form-control");
+    textarea.classList.add("form-control", "d-none");
+    textarea.value = noteText;
 
-    if (existingNotes[i - 1]) {
-      textarea.value = existingNotes[i - 1];
-    }
+    renderedDiv.addEventListener("click", () => {
+      renderedDiv.classList.add("d-none");
+      textarea.classList.remove("d-none");
+      textarea.focus();
+    });
+
+    textarea.addEventListener("blur", () => {
+      const updatedText = textarea.value;
+      renderedDiv.innerHTML = marked.parse(updatedText);
+      renderedDiv.classList.remove("d-none");
+      textarea.classList.add("d-none");
+    });
 
     wrapper.appendChild(label);
+    wrapper.appendChild(renderedDiv);
     wrapper.appendChild(textarea);
     notesContainer.appendChild(wrapper);
   }
@@ -81,7 +99,9 @@ saveNotesBtn.addEventListener("click", () => {
     notes: notesArray,
   };
 
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const blob = new Blob([JSON.stringify(data, null, 2)], {
+    type: "application/json",
+  });
   const url = URL.createObjectURL(blob);
 
   const a = document.createElement("a");

@@ -27,6 +27,15 @@ html, body {
 }
 
 textarea {
-  height: 450px;
+  height: 25rem;
   resize: none;
+  overflow: auto;
+}
+
+.markdown-preview {
+  height: 25rem;
+  cursor: text;
+  overflow: auto;
+  white-space: normal;
+  word-wrap: break-word;
 }
