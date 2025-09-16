@@ -8,6 +8,10 @@
     <link rel="stylesheet" href="style.css">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.6/dist/css/bootstrap.min.css" rel="stylesheet"
         integrity="sha384-4Q6Gf2aSP4eDXB8Miphtr37CMZZQ5oXLH2yaXMJ2w8e2ZtHTl7GptT4jmndRuHDT" crossorigin="anonymous">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- PDF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 
 <body>
@@ -24,21 +28,64 @@
     </nav>
 
     <div class="container-fluid">
-        <div class="row">
-            <div class="col-7 p-0">
-                <iframe id="pdf-frame"></iframe>
-            </div>
-            <div class="col-5 p-2 overflow-auto" id="notes-panel">
-                <div class="column">
-                    <div id="notes-container">
-                        <!-- Textareas -->
-                    </div>
-                    <div class="row mt-3">
-                        <div class="col-2">
-                            <input type="number" id="notes-count" class="form-control" min="1" max="1000" value="1">
+        <div class="row main-content-row">
+            <div class="col-6 p-0 pdf-section">
+                <div class="pdf-container">
+                    <div id="pdf-loading" class="pdf-loading-indicator">
+                        <div class="text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading PDF...</span>
+                            </div>
+                            <p class="mt-2">Loading PDF...</p>
                         </div>
-                        <div class="col">
-                            <button id="add-notes-btn" class="btn btn-primary">Set Notes</button>
+                    </div>
+                    <canvas id="pdf-canvas" class="pdf-canvas"></canvas>
+                    <div id="pdf-placeholder" class="pdf-placeholder">
+                        <div class="text-center text-muted">
+                            <i class="fas fa-file-pdf fa-4x mb-3"></i>
+                            <h4>No PDF loaded</h4>
+                            <p>Select a PDF file to start taking notes</p>
+                        </div>
+                    </div>
+                    <div class="pdf-overlay">
+                        <div class="page-navigation">
+                            <button id="prev-page-btn" class="btn btn-outline-light nav-btn" disabled>
+                                &#8592; Prev
+                            </button>
+                            <span id="page-indicator" class="page-info">Page 1 of 1</span>
+                            <button id="next-page-btn" class="btn btn-outline-light nav-btn" disabled>
+                                Next &#8594;
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 p-0 notes-section">
+                <div id="notes-panel" class="notes-panel-height">
+                    <div class="notes-content notes-content-height">
+                        <div class="notes-header">
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <h5 class="mb-0">Notes for Page <span id="current-page-notes" class="text-primary">1</span></h5>
+                                <div class="page-sync-indicator">
+                                    <i id="sync-icon" class="fas fa-sync-alt text-success" title="PDF and notes are synchronized"></i>
+                                </div>
+                            </div>
+                            <div class="pdf-info mb-3" id="pdf-info" style="display: none;">
+                                <small class="text-muted">
+                                    <i class="fas fa-file-pdf"></i> 
+                                    <span id="pdf-name">No PDF loaded</span> 
+                                    (<span id="pdf-pages">0</span> pages)
+                                </small>
+                            </div>
+                        </div>
+                        <div id="notes-container" class="notes-editor-container">
+                            <!-- Note per la pagina corrente -->
+                            <div class="current-page-note">
+                                <div class="border p-3 bg-light markdown-preview" id="note-preview">
+                                    <em>Click here to start taking notes for page 1...</em>
+                                </div>
+                                <textarea id="note-textarea" class="form-control d-none" placeholder="Write your notes here (Markdown supported)..."></textarea>
+                            </div>
                         </div>
                     </div>
                 </div>
