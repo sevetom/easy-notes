@@ -21,6 +21,12 @@ const prevPageBtn = document.getElementById("prev-page-btn");
 const nextPageBtn = document.getElementById("next-page-btn");
 const pageIndicator = document.getElementById("page-indicator");
 
+// Zoom elements
+const zoomInBtn = document.getElementById("zoom-in-btn");
+const zoomOutBtn = document.getElementById("zoom-out-btn");
+const zoomResetBtn = document.getElementById("zoom-reset-btn");
+const zoomIndicator = document.getElementById("zoom-indicator");
+
 // Notes elements
 const notePreview = document.getElementById("note-preview");
 const noteTextarea = document.getElementById("note-textarea");
@@ -35,11 +41,24 @@ let notes = {}; // Object to store notes for each page
 let isEditingNote = false;
 let pdfDocument = null;
 let renderingPage = false;
+let currentZoom = 1.0; // Current zoom level
+let minZoom = 0.5; // Minimum zoom level
+let maxZoom = 3.0; // Maximum zoom level
+
+// Panning state
+let isPanning = false;
+let panStartX = 0;
+let panStartY = 0;
+let panOffsetX = 0;
+let panOffsetY = 0;
 
 // Initialize the application
 function initializeApp() {
   updatePageIndicator();
   updateNavigationButtons();
+  updateZoomIndicator();
+  updateZoomButtons();
+  updateCanvasCursor();
   loadCurrentPageNote();
   showSyncStatus(true);
   
@@ -49,17 +68,41 @@ function initializeApp() {
   
   // Add keyboard shortcuts help
   const shortcutsDiv = document.createElement('div');
-  shortcutsDiv.className = 'shortcuts-help';
+  shortcutsDiv.className = 'shortcuts-help collapsed'; // Start collapsed
   shortcutsDiv.innerHTML = `
-    <strong>Keyboard Shortcuts:</strong><br>
-    ← → Navigate pages (auto-focus)<br>
-    <strong>While editing:</strong><br>
-    Ctrl+← → Navigate while typing<br>
-    Alt+← → Alternative navigation<br>
-    Enter: Start editing | Esc: Exit<br>
-    Ctrl+S: Save notes
+    <div class="shortcuts-help-header">
+      <strong>Keyboard Shortcuts</strong>
+      <button class="shortcuts-toggle" title="Show shortcuts">
+        <i class="fas fa-chevron-up"></i>
+      </button>
+    </div>
+    <div class="shortcuts-help-content">
+      ← → Navigate pages (auto-focus)<br>
+      <strong>While editing:</strong><br>
+      Ctrl+← → Navigate while typing<br>
+      Alt+← → Alternative navigation<br>
+      Enter: Start editing | Esc: Exit<br>
+      Ctrl+S: Save notes
+    </div>
   `;
   document.body.appendChild(shortcutsDiv);
+  
+  // Add toggle functionality for shortcuts help
+  const toggleBtn = shortcutsDiv.querySelector('.shortcuts-toggle');
+  toggleBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    shortcutsDiv.classList.toggle('collapsed');
+    const isCollapsed = shortcutsDiv.classList.contains('collapsed');
+    const icon = toggleBtn.querySelector('i');
+    icon.className = isCollapsed ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
+    toggleBtn.title = isCollapsed ? 'Show shortcuts' : 'Hide shortcuts';
+  });
+  
+  // Also allow clicking on header to toggle
+  const header = shortcutsDiv.querySelector('.shortcuts-help-header');
+  header.addEventListener('click', () => {
+    toggleBtn.click();
+  });
 }
 
 // Show sync status
@@ -154,19 +197,25 @@ async function renderPage(pageNumber) {
     // Calculate scale to fit container with proper aspect ratio
     const container = canvas.parentElement;
     const containerWidth = container.clientWidth - 40; // Account for padding
-    const containerHeight = container.clientHeight - 100; // Account for navigation overlay
+    const containerHeight = container.clientHeight - 40; // Account for navigation overlay at top (now smaller)
     const viewport = page.getViewport({ scale: 1 });
     
-    // Calculate scale to fit both width and height
+    // Calculate base scale to fit both width and height
     const scaleX = containerWidth / viewport.width;
     const scaleY = containerHeight / viewport.height;
-    const scale = Math.min(scaleX, scaleY, 2.0); // Max scale of 2.0 for better quality
+    const baseScale = Math.min(scaleX, scaleY, 2.0); // Max base scale of 2.0 for better quality
     
-    const scaledViewport = page.getViewport({ scale: scale });
+    // Apply current zoom to the base scale
+    const finalScale = baseScale * currentZoom;
+    
+    const scaledViewport = page.getViewport({ scale: finalScale });
     
     // Set canvas dimensions
     canvas.height = scaledViewport.height;
     canvas.width = scaledViewport.width;
+    
+    // Update canvas position based on pan offset
+    canvas.style.transform = `translate(${panOffsetX}px, ${panOffsetY}px)`;
     
     // Clear canvas
     context.clearRect(0, 0, canvas.width, canvas.height);
@@ -229,6 +278,71 @@ function updatePageIndicator() {
 function updateNavigationButtons() {
   prevPageBtn.disabled = currentPage <= 1;
   nextPageBtn.disabled = currentPage >= totalPages;
+}
+
+// Zoom functions
+function updateZoomIndicator() {
+  zoomIndicator.textContent = Math.round(currentZoom * 100) + '%';
+}
+
+function updateZoomButtons() {
+  zoomOutBtn.disabled = currentZoom <= minZoom;
+  zoomInBtn.disabled = currentZoom >= maxZoom;
+}
+
+async function zoomIn(centerX = null, centerY = null) {
+  if (currentZoom < maxZoom) {
+    await zoomTo(Math.min(currentZoom + 0.25, maxZoom), centerX, centerY);
+  }
+}
+
+async function zoomOut(centerX = null, centerY = null) {
+  if (currentZoom > minZoom) {
+    await zoomTo(Math.max(currentZoom - 0.25, minZoom), centerX, centerY);
+  }
+}
+
+async function zoomTo(newZoom, centerX = null, centerY = null) {
+  if (!pdfDocument) return;
+  
+  const oldZoom = currentZoom;
+  currentZoom = newZoom;
+  
+  // If zoom position is specified, adjust pan offset to zoom towards that point
+  if (centerX !== null && centerY !== null) {
+    const canvas = pdfCanvas;
+    const container = canvas.parentElement;
+    const rect = container.getBoundingClientRect();
+    
+    // Calculate relative position within the container
+    const relativeX = centerX - rect.left;
+    const relativeY = centerY - rect.top;
+    
+    // Calculate how much the zoom center should move
+    const zoomFactor = newZoom / oldZoom;
+    const deltaX = (relativeX - container.clientWidth / 2) * (zoomFactor - 1);
+    const deltaY = (relativeY - container.clientHeight / 2) * (zoomFactor - 1);
+    
+    // Adjust pan offset
+    panOffsetX -= deltaX;
+    panOffsetY -= deltaY;
+  } else if (newZoom === 1.0) {
+    // Reset pan when zoom is reset
+    panOffsetX = 0;
+    panOffsetY = 0;
+  }
+  
+  updateZoomIndicator();
+  updateZoomButtons();
+  updateCanvasCursor();
+  await renderPage(currentPage);
+  
+  console.log(`Zoomed to ${Math.round(currentZoom * 100)}%`);
+}
+
+async function resetZoom() {
+  await zoomTo(1.0);
+  console.log('Zoom reset to 100%');
 }
 
 // Remove the old updatePDFPage function as it's no longer needed
@@ -329,6 +443,61 @@ nextPageBtn.addEventListener("click", async () => {
   }
 });
 
+// Zoom event listeners
+zoomInBtn.addEventListener("click", zoomIn);
+zoomOutBtn.addEventListener("click", zoomOut);
+zoomResetBtn.addEventListener("click", resetZoom);
+
+// Mouse wheel zoom on PDF canvas
+pdfCanvas.addEventListener("wheel", async (e) => {
+  if (e.ctrlKey || e.metaKey) { // Ctrl+wheel or Cmd+wheel for zoom
+    e.preventDefault();
+    
+    if (e.deltaY < 0) { // Scroll up = zoom in
+      await zoomIn(e.clientX, e.clientY);
+    } else { // Scroll down = zoom out
+      await zoomOut(e.clientX, e.clientY);
+    }
+  }
+});
+
+// Mouse panning on PDF canvas
+pdfCanvas.addEventListener("mousedown", (e) => {
+  if (currentZoom > 1.0 && e.button === 0) { // Left mouse button and zoomed in
+    isPanning = true;
+    panStartX = e.clientX - panOffsetX;
+    panStartY = e.clientY - panOffsetY;
+    pdfCanvas.style.cursor = 'grabbing';
+    e.preventDefault();
+  }
+});
+
+document.addEventListener("mousemove", async (e) => {
+  if (isPanning) {
+    panOffsetX = e.clientX - panStartX;
+    panOffsetY = e.clientY - panStartY;
+    
+    // Apply the transform immediately for smooth panning
+    pdfCanvas.style.transform = `translate(${panOffsetX}px, ${panOffsetY}px)`;
+  }
+});
+
+document.addEventListener("mouseup", () => {
+  if (isPanning) {
+    isPanning = false;
+    pdfCanvas.style.cursor = currentZoom > 1.0 ? 'grab' : 'default';
+  }
+});
+
+// Update cursor based on zoom level
+function updateCanvasCursor() {
+  if (currentZoom > 1.0) {
+    pdfCanvas.style.cursor = 'grab';
+  } else {
+    pdfCanvas.style.cursor = 'default';
+  }
+}
+
 // Remove manual page setting since we auto-detect from PDF
 // setPagesBtn functionality is no longer needed as pages are auto-detected from PDF
 
@@ -357,6 +526,12 @@ noteTextarea.addEventListener("keydown", async (e) => {
     saveCurrentNote();
     showSaveConfirmation();
     console.log("Manual save with Ctrl+S in textarea");
+    return;
+  }
+  
+  // Allow standard editing shortcuts (Ctrl+Z, Ctrl+Y, Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X)
+  if (e.ctrlKey && ['z', 'y', 'a', 'c', 'v', 'x'].includes(e.key.toLowerCase())) {
+    // Let these through without interference
     return;
   }
   
@@ -394,14 +569,6 @@ noteTextarea.addEventListener("keydown", async (e) => {
       await goToPage(targetPage, true); // Keep auto-focus enabled
     }
     return;
-  }
-});
-
-// Prevent losing focus when clicking on textarea scrollbar
-noteTextarea.addEventListener("mousedown", (e) => {
-  if (e.target === noteTextarea) {
-    e.preventDefault();
-    noteTextarea.focus();
   }
 });
 
@@ -530,6 +697,9 @@ closeBtn.addEventListener("click", () => {
   notes = {};
   currentPage = 1;
   totalPages = 1;
+  currentZoom = 1.0; // Reset zoom
+  panOffsetX = 0; // Reset pan
+  panOffsetY = 0;
   
   // Hide PDF and show placeholder
   pdfCanvas.style.display = 'none';
@@ -541,6 +711,8 @@ closeBtn.addEventListener("click", () => {
   
   updatePageIndicator();
   updateNavigationButtons();
+  updateZoomIndicator();
+  updateZoomButtons();
   loadCurrentPageNote();
   showSyncStatus(true);
 });

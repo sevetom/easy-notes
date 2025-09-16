@@ -5,19 +5,41 @@ html, body {
   overflow: hidden;
 }
 
+/* Custom navbar styling */
+.navbar {
+  padding: 0.25rem 1rem !important;
+  min-height: 2.5rem !important;
+}
+
+.navbar .navbar-brand {
+  font-size: 1.1em;
+  margin-right: 0.5rem;
+}
+
+.navbar .btn {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875em;
+  margin-left: 0.25rem;
+}
+
+.navbar input[type="file"] {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875em;
+}
+
 .main-content-row {
-  height: calc(100vh - 56px);
+  height: calc(100vh - 2.5rem);
 }
 
 /* Layout sections */
 .pdf-section {
-  border-right: 2px solid #dee2e6;
-  height: calc(100vh - 56px);
+  border-right: 0.125rem solid #dee2e6;
+  height: calc(100vh - 2.5rem);
 }
 
 .notes-section {
   background-color: #f8f9fa;
-  height: calc(100vh - 56px);
+  height: calc(100vh - 2.5rem);
 }
 
 #load-notes-input {
@@ -35,19 +57,20 @@ html, body {
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  padding: 20px;
+  padding: 1.25rem;
   box-sizing: border-box;
 }
 
 .pdf-canvas {
-  max-width: 100%;
-  max-height: calc(100% - 80px); /* Account for navigation overlay */
+  max-width: none; /* Allow canvas to exceed container when zoomed */
+  max-height: none; /* Allow canvas to exceed container when zoomed */
   width: auto;
   height: auto;
   display: block;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 0.25rem 1.25rem rgba(0, 0, 0, 0.15);
   background-color: white;
-  border-radius: 4px;
+  border-radius: 0.25rem;
+  margin: auto; /* Center the canvas when smaller than container */
 }
 
 .pdf-placeholder {
@@ -69,38 +92,102 @@ html, body {
 
 .pdf-overlay {
   position: absolute;
-  bottom: 0;
+  top: 0;
   left: 0;
   right: 0;
-  background: rgba(0, 0, 0, 0.7);
-  padding: 10px;
-  backdrop-filter: blur(5px);
+  background: rgba(0, 0, 0, 0.75);
+  padding: 0.25rem 0.75rem;
+  backdrop-filter: blur(0.3125rem);
+  z-index: 10;
+  border-bottom: 0.0625rem solid rgba(255, 255, 255, 0.1);
+}
+
+.pdf-controls-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  padding: 0 0.625rem;
 }
 
 .page-navigation {
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 20px;
+  gap: 0.625rem;
+  flex: 1;
+}
+
+.zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.zoom-btn {
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: white;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.625em;
+  text-align: center;
+  padding: 0 0.5rem;
+  line-height: 1;
+}
+
+.zoom-info {
+  color: white;
+  font-weight: 600;
+  font-size: 0.75em;
+  min-width: 2.625rem;
+  height: 2rem;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0 0.5rem;
+  border-radius: 0.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .nav-btn {
-  min-width: 80px;
-  font-size: 14px;
+  min-width: 5rem;
+  height: 2rem;
+  font-size: 0.625em;
   font-weight: 600;
+  padding: 0 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  border-radius: 0.25rem;
+  white-space: nowrap;
 }
 
 .page-info {
   color: white;
   font-weight: 600;
-  font-size: 16px;
-  min-width: 120px;
+  font-size: 0.875em;
+  min-width: 7.5rem;
+  height: 2rem;
   text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 /* Notes Panel */
 .notes-panel-height {
-  height: calc(100vh - 56px);
+  height: calc(100vh - 2.5rem);
   display: flex;
   flex-direction: column;
 }
@@ -109,25 +196,25 @@ html, body {
   height: 100%;
   display: flex;
   flex-direction: column;
-  padding: 20px;
+  padding: 1.25rem;
   box-sizing: border-box;
 }
 
 .notes-header {
-  border-bottom: 2px solid #dee2e6;
-  padding-bottom: 15px;
-  margin-bottom: 20px;
+  border-bottom: 0.125rem solid #dee2e6;
+  padding-bottom: 0.9375rem;
+  margin-bottom: 1.25rem;
   flex-shrink: 0;
 }
 
 .page-sync-indicator {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 0.3125rem;
 }
 
 .page-sync-indicator i {
-  font-size: 18px;
+  font-size: 1.125em;
 }
 
 .page-sync-indicator i.fa-sync-alt {
@@ -140,8 +227,8 @@ html, body {
 
 .pdf-info {
   background-color: #e9ecef;
-  border-radius: 4px;
-  padding: 8px 12px;
+  border-radius: 0.25rem;
+  padding: 0.5rem 0.75rem;
 }
 
 .notes-editor-container {
@@ -160,13 +247,13 @@ html, body {
   flex: 1;
   resize: none;
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  font-size: 16px;
+  font-size: 1em;
   line-height: 1.6;
-  border: 2px solid #ced4da;
-  border-radius: 8px;
-  padding: 20px;
+  border: 0.125rem solid #ced4da;
+  border-radius: 0.5rem;
+  padding: 1.25rem;
   box-sizing: border-box;
-  min-height: 300px;
+  min-height: 18.75rem;
 }
 
 #note-textarea:focus {
@@ -181,13 +268,14 @@ html, body {
   overflow-y: auto;
   white-space: normal;
   word-wrap: break-word;
-  border: 2px solid #dee2e6;
-  border-radius: 8px;
-  padding: 20px;
+  border: 0.125rem solid #dee2e6;
+  border-radius: 0.5rem;
+  padding: 1.25rem;
   background-color: white;
-  min-height: 300px;
+  min-height: 18.75rem;
+  max-height: calc(100vh - 10rem);
   box-sizing: border-box;
-  font-size: 16px;
+  font-size: 1em;
   line-height: 1.6;
 }
 
@@ -204,34 +292,134 @@ html, body {
 /* Keyboard shortcuts help */
 .shortcuts-help {
   position: fixed;
-  bottom: 10px;
-  right: 10px;
+  bottom: 0.625rem;
+  right: 0.625rem;
   background: rgba(0, 0, 0, 0.9);
   color: white;
-  padding: 12px 16px;
-  border-radius: 8px;
-  font-size: 11px;
+  border-radius: 0.5rem;
+  font-size: 0.6875em;
   line-height: 1.4;
   z-index: 1000;
   font-family: monospace;
-  border: 1px solid #444;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  max-width: 240px;
+  border: 0.0625rem solid #444;
+  box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.3);
+  max-width: 15rem;
+  transition: all 0.3s ease;
+}
+
+.shortcuts-help-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 0.0625rem solid #555;
+  cursor: pointer;
+  user-select: none;
+}
+
+.shortcuts-help-header:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.shortcuts-help-content {
+  padding: 0.75rem 1rem;
+  transition: all 0.3s ease;
+  overflow: hidden;
+}
+
+.shortcuts-help.collapsed .shortcuts-help-content {
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  opacity: 0;
+}
+
+.shortcuts-help.collapsed {
+  max-width: 7.5rem;
+}
+
+.shortcuts-toggle {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 0.75em;
+  cursor: pointer;
+  padding: 0.125rem;
+  border-radius: 0.1875rem;
+  transition: background 0.2s ease;
+}
+
+.shortcuts-toggle:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
 /* Responsive adjustments */
 @media (max-width: 768px) {
+  .pdf-overlay {
+    padding: 0.1875rem 0.5rem;
+  }
+  
+  .pdf-controls-container {
+    flex-direction: row;
+    justify-content: space-between;
+    gap: 0.625rem;
+    padding: 0 0.3125rem;
+  }
+  
   .page-navigation {
-    flex-direction: column;
-    gap: 10px;
+    gap: 0.375rem;
+    flex: 1;
+    justify-content: center;
+  }
+  
+  .zoom-controls {
+    gap: 0.25rem;
   }
   
   .nav-btn {
-    min-width: 60px;
-    font-size: 12px;
+    min-width: 4.0625rem;
+    height: 1.75rem;
+    font-size: 0.5625em;
+    padding: 0 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    border-radius: 0.1875rem;
+    white-space: nowrap;
+  }
+  
+  .zoom-btn {
+    width: 1.625rem;
+    height: 1.625rem;
+    font-size: 0.5625em;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    border-radius: 0.1875rem;
   }
   
   .page-info {
-    font-size: 14px;
+    font-size: 0.6875em;
+    min-width: 6.25rem;
+    height: 1.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+  
+  .zoom-info {
+    font-size: 0.625em;
+    min-width: 2.375rem;
+    height: 1.75rem;
+    padding: 0 0.375rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    border-radius: 0.1875rem;
   }
 }

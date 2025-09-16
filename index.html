@@ -31,6 +31,31 @@
         <div class="row main-content-row">
             <div class="col-6 p-0 pdf-section">
                 <div class="pdf-container">
+                    <div class="pdf-overlay">
+                        <div class="pdf-controls-container">
+                            <div class="zoom-controls">
+                                <button id="zoom-out-btn" class="btn btn-outline-light zoom-btn" title="Zoom Out">
+                                    <i class="fas fa-search-minus"></i>
+                                </button>
+                                <span id="zoom-indicator" class="zoom-info">100%</span>
+                                <button id="zoom-in-btn" class="btn btn-outline-light zoom-btn" title="Zoom In">
+                                    <i class="fas fa-search-plus"></i>
+                                </button>
+                                <button id="zoom-reset-btn" class="btn btn-outline-light zoom-btn" title="Reset Zoom">
+                                    <i class="fas fa-expand-arrows-alt"></i>
+                                </button>
+                            </div>
+                            <div class="page-navigation">
+                                <button id="prev-page-btn" class="btn btn-outline-light nav-btn" disabled>
+                                    &#8592; Prev
+                                </button>
+                                <span id="page-indicator" class="page-info">Page 1 of 1</span>
+                                <button id="next-page-btn" class="btn btn-outline-light nav-btn" disabled>
+                                    Next &#8594;
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                     <div id="pdf-loading" class="pdf-loading-indicator">
                         <div class="text-center">
                             <div class="spinner-border text-primary" role="status">
@@ -45,17 +70,6 @@
                             <i class="fas fa-file-pdf fa-4x mb-3"></i>
                             <h4>No PDF loaded</h4>
                             <p>Select a PDF file to start taking notes</p>
-                        </div>
-                    </div>
-                    <div class="pdf-overlay">
-                        <div class="page-navigation">
-                            <button id="prev-page-btn" class="btn btn-outline-light nav-btn" disabled>
-                                &#8592; Prev
-                            </button>
-                            <span id="page-indicator" class="page-info">Page 1 of 1</span>
-                            <button id="next-page-btn" class="btn btn-outline-light nav-btn" disabled>
-                                Next &#8594;
-                            </button>
                         </div>
                     </div>
                 </div>
