@@ -19,7 +19,8 @@ const pdfPages = document.getElementById("pdf-pages");
 // Navigation elements
 const prevPageBtn = document.getElementById("prev-page-btn");
 const nextPageBtn = document.getElementById("next-page-btn");
-const pageIndicator = document.getElementById("page-indicator");
+const pageInput = document.getElementById("page-input");
+const totalPagesDisplay = document.getElementById("total-pages-display");
 
 // Zoom elements
 const zoomInBtn = document.getElementById("zoom-in-btn");
@@ -271,7 +272,9 @@ async function goToPage(page, autoFocus = false) {
 }
 
 function updatePageIndicator() {
-  pageIndicator.textContent = `Page ${currentPage} of ${totalPages}`;
+  pageInput.value = currentPage;
+  pageInput.max = totalPages;
+  totalPagesDisplay.textContent = totalPages;
   currentPageNotesSpan.textContent = currentPage;
 }
 
@@ -440,6 +443,30 @@ prevPageBtn.addEventListener("click", async () => {
 nextPageBtn.addEventListener("click", async () => {
   if (currentPage < totalPages) {
     await goToPage(currentPage + 1, false); // No auto-focus for button clicks
+  }
+});
+
+// Page input event listeners
+pageInput.addEventListener("change", async (e) => {
+  const targetPage = parseInt(e.target.value);
+  if (targetPage && targetPage >= 1 && targetPage <= totalPages && targetPage !== currentPage) {
+    await goToPage(targetPage, false);
+  } else {
+    // Revert to current page if invalid input
+    pageInput.value = currentPage;
+  }
+});
+
+pageInput.addEventListener("keydown", async (e) => {
+  if (e.key === "Enter") {
+    const targetPage = parseInt(e.target.value);
+    if (targetPage && targetPage >= 1 && targetPage <= totalPages && targetPage !== currentPage) {
+      await goToPage(targetPage, false);
+    } else {
+      // Revert to current page if invalid input
+      pageInput.value = currentPage;
+    }
+    e.target.blur(); // Remove focus from input
   }
 });
 
