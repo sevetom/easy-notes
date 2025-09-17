@@ -51,35 +51,118 @@ html, body {
   position: relative;
   height: 100%;
   overflow: hidden;
-  background: #525659;
+  background: #f5f5f5;
 }
 
 .pdf-controls {
   position: absolute;
-  bottom: 10px;
+  bottom: 0.625rem;
   left: 50%;
   transform: translateX(-50%);
   z-index: 1000;
   background: rgba(0, 0, 0, 0.7);
-  padding: 5px 10px;
-  border-radius: 5px;
+  padding: 0.5rem 1.25rem;
+  border-radius: 0.5rem;
   color: white;
+  white-space: nowrap;
+  box-shadow: 0 0.125rem 0.625rem rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .pdf-controls button {
-  margin: 0 2px;
+  margin: 0;
+  min-width: 2rem;
+  height: 2rem;
+  font-size: 0.875rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pdf-controls button.active {
+  background-color: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.pdf-controls .btn-outline-warning.active {
+  background-color: rgba(255, 193, 7, 0.3);
+  border-color: #ffc107;
+  color: #fffb07;
+}
+
+.pdf-controls .btn-outline-danger.active {
+  background-color: rgba(220, 53, 69, 0.3);
+  border-color: #dc3545;
+  color: #ff6b6b;
+}
+
+.zoom-info {
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  padding: 0 0.5rem;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
 }
 
 .pdf-controls span {
-  margin: 0 5px;
+  margin: 0;
   color: white;
+  font-size: 0.875rem;
+}
+
+.page-navigation {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  height: 2rem;
+}
+
+.page-input-field {
+  width: 3rem;
+  height: 1.75rem;
+  padding: 0.125rem 0.375rem;
+  border: 0.0625rem solid rgba(255, 255, 255, 0.3);
+  border-radius: 0.25rem;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  text-align: center;
+  font-size: 0.875rem;
+  outline: none;
+  margin: 0 0.25rem;
+}
+
+.page-input-field:focus {
+  border-color: rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.page-input-field::-webkit-outer-spin-button,
+.page-input-field::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.page-input-field[type=number] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.page-total {
+  color: white;
+  font-size: 0.875rem;
+  margin-left: 0.25rem;
 }
 
 .zoom-clickable {
   cursor: pointer;
   user-select: none;
-  padding: 2px 4px;
-  border-radius: 3px;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.1875rem;
   transition: background-color 0.2s ease;
 }
 
@@ -154,6 +237,16 @@ html, body {
   background-color: rgba(0, 100, 0, 1);
 }
 
+/* Custom highlights */
+.textLayer .user-highlight {
+  background-color: rgba(255, 255, 0, 1) !important;
+  border-radius: 2px;
+}
+
+.textLayer .user-highlight:hover {
+  background-color: rgba(255, 255, 0, 0.9) !important;
+}
+
 .pdf-placeholder {
   position: relative;
   width: 100%;
@@ -175,7 +268,7 @@ html, body {
   height: auto;
   display: block;
   box-shadow: 0 0.25rem 1.25rem rgba(0, 0, 0, 0.15);
-  background-color: white;
+  background-color: #f5f5f5;
   border-radius: 0.25rem;
   margin: auto; /* Center the canvas when smaller than container */
 }
@@ -445,7 +538,7 @@ html, body {
   font-family: monospace;
   border: 0.0625rem solid #444;
   box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.3);
-  max-width: 15rem;
+  max-width: 17rem;
   transition: all 0.3s ease;
 }
 
