@@ -1,24 +1,5 @@
 // Configure PDF.js
-if (typeof pdfjsLib !== 'undefined') {
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-  
-  // Set additional PDF.js options to prevent errors
-  pdfjsLib.GlobalWorkerOptions.isEvalSupported = false;
-} else {
-  console.error('PDF.js library not loaded properly');
-}
-
-// Global error handler
-window.addEventListener('error', function(event) {
-  console.error('Global error:', event.error);
-  console.error('Error at line:', event.lineno, 'column:', event.colno);
-  console.error('File:', event.filename);
-});
-
-// Handle unhandled promise rejections
-window.addEventListener('unhandledrejection', function(event) {
-  console.error('Unhandled promise rejection:', event.reason);
-});
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 // DOM Elements
 const input = document.getElementById("file-input");
@@ -28,8 +9,9 @@ const loadNotesInput = document.getElementById("load-notes-input");
 const closeBtn = document.getElementById("close-btn");
 
 // PDF elements
+const pdfViewer = document.getElementById("pdf-viewer");
 const pdfCanvas = document.getElementById("pdf-canvas");
-const pdfLoading = document.getElementById("pdf-loading");
+const textLayer = document.getElementById("text-layer");
 const pdfPlaceholder = document.getElementById("pdf-placeholder");
 const pdfInfo = document.getElementById("pdf-info");
 const pdfName = document.getElementById("pdf-name");
@@ -38,14 +20,10 @@ const pdfPages = document.getElementById("pdf-pages");
 // Navigation elements
 const prevPageBtn = document.getElementById("prev-page-btn");
 const nextPageBtn = document.getElementById("next-page-btn");
-const pageInput = document.getElementById("page-input");
-const totalPagesDisplay = document.getElementById("total-pages-display");
-
-// Zoom elements
+const pageInfo = document.getElementById("page-info");
 const zoomInBtn = document.getElementById("zoom-in-btn");
 const zoomOutBtn = document.getElementById("zoom-out-btn");
-const zoomResetBtn = document.getElementById("zoom-reset-btn");
-const zoomIndicator = document.getElementById("zoom-indicator");
+const zoomInfo = document.getElementById("zoom-info");
 
 // Notes elements
 const notePreview = document.getElementById("note-preview");
@@ -60,10 +38,7 @@ let totalPages = 1;
 let notes = {}; // Object to store notes for each page
 let isEditingNote = false;
 let pdfDocument = null;
-let renderingPage = false;
-let currentZoom = 1.0; // Current zoom level
-let minZoom = 0.5; // Minimum zoom level
-let maxZoom = 3.0; // Maximum zoom level
+let currentZoom = 1.0;
 
 // Panning state
 let isPanning = false;
@@ -74,55 +49,15 @@ let panOffsetY = 0;
 
 // Initialize the application
 function initializeApp() {
-  updatePageIndicator();
-  updateNavigationButtons();
-  updateZoomIndicator();
-  updateZoomButtons();
-  updateCanvasCursor();
   loadCurrentPageNote();
   showSyncStatus(true);
+  updatePageInfo();
+  updateNavigationButtons();
+  setupPanning();
   
   // Show placeholder initially
-  pdfPlaceholder.style.display = 'block';
-  pdfCanvas.style.display = 'none';
-  
-  // Add keyboard shortcuts help
-  const shortcutsDiv = document.createElement('div');
-  shortcutsDiv.className = 'shortcuts-help collapsed'; // Start collapsed
-  shortcutsDiv.innerHTML = `
-    <div class="shortcuts-help-header">
-      <strong>Keyboard Shortcuts</strong>
-      <button class="shortcuts-toggle" title="Show shortcuts">
-        <i class="fas fa-chevron-up"></i>
-      </button>
-    </div>
-    <div class="shortcuts-help-content">
-      ← → Navigate pages (auto-focus)<br>
-      <strong>While editing:</strong><br>
-      Ctrl+← → Navigate while typing<br>
-      Alt+← → Alternative navigation<br>
-      Enter: Start editing | Esc: Exit<br>
-      Ctrl+S: Save notes
-    </div>
-  `;
-  document.body.appendChild(shortcutsDiv);
-  
-  // Add toggle functionality for shortcuts help
-  const toggleBtn = shortcutsDiv.querySelector('.shortcuts-toggle');
-  toggleBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    shortcutsDiv.classList.toggle('collapsed');
-    const isCollapsed = shortcutsDiv.classList.contains('collapsed');
-    const icon = toggleBtn.querySelector('i');
-    icon.className = isCollapsed ? 'fas fa-chevron-up' : 'fas fa-chevron-down';
-    toggleBtn.title = isCollapsed ? 'Show shortcuts' : 'Hide shortcuts';
-  });
-  
-  // Also allow clicking on header to toggle
-  const header = shortcutsDiv.querySelector('.shortcuts-help-header');
-  header.addEventListener('click', () => {
-    toggleBtn.click();
-  });
+  pdfPlaceholder.style.display = 'flex';
+  pdfViewer.style.display = 'none';
 }
 
 // Show sync status
@@ -150,8 +85,6 @@ function showSaveConfirmation() {
   }, 1500);
 }
 
-
-
 // PDF file handling with PDF.js
 input.addEventListener("change", async function () {
   const file = input.files[0];
@@ -175,204 +108,188 @@ input.addEventListener("change", async function () {
   }
 });
 
-// Load PDF using PDF.js
+// Load PDF using PDF.js with text layer
 async function loadPDF(file) {
   try {
     showSyncStatus(false);
-    pdfLoading.style.display = 'block';
-    pdfPlaceholder.style.display = 'none';
     
     const arrayBuffer = await file.arrayBuffer();
     pdfDocument = await pdfjsLib.getDocument(arrayBuffer).promise;
-    
-    // Update total pages automatically
     totalPages = pdfDocument.numPages;
-    currentPage = 1;
     
     // Update UI
     pdfName.textContent = file.name;
     pdfPages.textContent = totalPages;
-    pdfInfo.style.display = 'block';
+    if (pdfInfo) pdfInfo.style.display = 'block';
+    
+    // Show PDF viewer and hide placeholder
+    pdfPlaceholder.style.display = 'none';
+    pdfViewer.style.display = 'block';
     
     // Render first page
+    currentPage = 1;
     await renderPage(currentPage);
     
-    // Update navigation
-    updatePageIndicator();
+    updatePageInfo();
     updateNavigationButtons();
     loadCurrentPageNote();
     
-    pdfLoading.style.display = 'none';
-    pdfCanvas.style.display = 'block';
     showSyncStatus(true);
+    
   } catch (error) {
-    console.error('Error loading PDF:', error);
     alert('Error loading PDF: ' + error.message);
-    pdfLoading.style.display = 'none';
-    pdfPlaceholder.style.display = 'block';
   }
 }
 
-// Render a specific page
-async function renderPage(pageNumber) {
-  if (!pdfDocument || renderingPage) return;
+// Render PDF page with text layer
+async function renderPage(pageNum) {
+  const page = await pdfDocument.getPage(pageNum);
+  const scale = currentZoom;
+  const viewport = page.getViewport({ scale: scale });
   
-  try {
-    renderingPage = true;
-    showSyncStatus(false);
-    
-    const page = await pdfDocument.getPage(pageNumber);
-    const canvas = pdfCanvas;
-    const context = canvas.getContext('2d');
-    
-    // Calculate scale to fit container with proper aspect ratio
-    const container = canvas.parentElement;
-    const containerWidth = container.clientWidth - 40; // Account for padding
-    const containerHeight = container.clientHeight - 40; // Account for navigation overlay at top (now smaller)
-    const viewport = page.getViewport({ scale: 1 });
-    
-    // Calculate base scale to fit both width and height
-    const scaleX = containerWidth / viewport.width;
-    const scaleY = containerHeight / viewport.height;
-    const baseScale = Math.min(scaleX, scaleY, 2.0); // Max base scale of 2.0 for better quality
-    
-    // Apply current zoom to the base scale
-    const finalScale = baseScale * currentZoom;
-    
-    const scaledViewport = page.getViewport({ scale: finalScale });
-    
-    // Set canvas dimensions
-    canvas.height = scaledViewport.height;
-    canvas.width = scaledViewport.width;
-    
-    // Update canvas position based on pan offset
-    canvas.style.transform = `translate(${panOffsetX}px, ${panOffsetY}px)`;
-    
-    // Clear canvas
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Render page
-    const renderContext = {
-      canvasContext: context,
-      viewport: scaledViewport
-    };
-    
-    await page.render(renderContext).promise;
-    
-    showSyncStatus(true);
-  } catch (error) {
-    console.error('Error rendering page:', error);
-  } finally {
-    renderingPage = false;
-  }
+  // Setup canvas
+  const canvas = pdfCanvas;
+  const context = canvas.getContext('2d');
+  canvas.height = viewport.height;
+  canvas.width = viewport.width;
+  
+  // Setup text layer with scale factor CSS variable
+  textLayer.style.width = viewport.width + 'px';
+  textLayer.style.height = viewport.height + 'px';
+  textLayer.style.setProperty('--scale-factor', scale);
+  textLayer.innerHTML = '';
+  
+  // Render PDF page
+  const renderContext = {
+    canvasContext: context,
+    viewport: viewport
+  };
+  await page.render(renderContext).promise;
+  
+  // Render text layer for text selection
+  const textContent = await page.getTextContent();
+  pdfjsLib.renderTextLayer({
+    textContentSource: textContent,
+    container: textLayer,
+    viewport: viewport,
+    textDivs: []
+  });
+  
+  // Apply current pan offset
+  updatePanTransform();
 }
 
-// Page navigation functions
-async function goToPage(page, autoFocus = false) {
-  if (page < 1 || page > totalPages || page === currentPage) return;
-  
-  const previousPage = currentPage;
-  
-  // Double-check: always save current note content before switching
-  saveCurrentNote();
-  
-  // Additional safety: verify the save worked correctly
-  const savedContent = notes[previousPage] || "";
-  const textareaContent = noteTextarea.value || "";
-  if (savedContent !== textareaContent) {
-    console.warn(`⚠️  Save verification failed! Re-saving page ${previousPage}`);
-    notes[previousPage] = textareaContent;
-  }
-  
-  currentPage = page;
-  
-  // Render the new page if PDF is loaded
-  if (pdfDocument) {
-    await renderPage(currentPage);
-  }
-  
-  // Update UI
-  updatePageIndicator();
-  updateNavigationButtons();
-  loadCurrentPageNote(autoFocus);
+// Update pan transform
+function updatePanTransform() {
+  const container = document.getElementById('pdf-canvas-container');
+  container.style.transform = `translate(${panOffsetX}px, ${panOffsetY}px)`;
 }
 
-function updatePageIndicator() {
-  pageInput.value = currentPage;
-  pageInput.max = totalPages;
-  totalPagesDisplay.textContent = totalPages;
-  currentPageNotesSpan.textContent = currentPage;
+// Setup panning event listeners
+function setupPanning() {
+  const viewer = pdfViewer;
+  
+  viewer.addEventListener('mousedown', (e) => {
+    if (e.button === 0 && currentZoom > 1.0) { // Left mouse button and zoomed in
+      isPanning = true;
+      panStartX = e.clientX - panOffsetX;
+      panStartY = e.clientY - panOffsetY;
+      viewer.classList.add('panning');
+      e.preventDefault();
+    }
+  });
+  
+  viewer.addEventListener('mousemove', (e) => {
+    if (isPanning) {
+      panOffsetX = e.clientX - panStartX;
+      panOffsetY = e.clientY - panStartY;
+      updatePanTransform();
+      e.preventDefault();
+    }
+  });
+  
+  viewer.addEventListener('mouseup', () => {
+    if (isPanning) {
+      isPanning = false;
+      viewer.classList.remove('panning');
+    }
+  });
+  
+  viewer.addEventListener('mouseleave', () => {
+    if (isPanning) {
+      isPanning = false;
+      viewer.classList.remove('panning');
+    }
+  });
 }
 
+// Update page info
+function updatePageInfo() {
+  pageInfo.textContent = `Page ${currentPage} of ${totalPages}`;
+  zoomInfo.textContent = `${Math.round(currentZoom * 100)}%`;
+}
+
+// Update navigation buttons
 function updateNavigationButtons() {
   prevPageBtn.disabled = currentPage <= 1;
   nextPageBtn.disabled = currentPage >= totalPages;
 }
 
+// Navigation functions
+async function goToPreviousPage() {
+  if (currentPage > 1) {
+    saveCurrentNote();
+    currentPage--;
+    await renderPage(currentPage);
+    updatePageInfo();
+    updateNavigationButtons();
+    loadCurrentPageNote();
+  }
+}
+
+async function goToNextPage() {
+  if (currentPage < totalPages) {
+    saveCurrentNote();
+    currentPage++;
+    await renderPage(currentPage);
+    updatePageInfo();
+    updateNavigationButtons();
+    loadCurrentPageNote();
+  }
+}
+
 // Zoom functions
-function updateZoomIndicator() {
-  zoomIndicator.textContent = Math.round(currentZoom * 100) + '%';
+async function zoomIn() {
+  currentZoom = Math.min(currentZoom * 1.2, 3.0);
+  await renderPage(currentPage);
+  updatePageInfo();
 }
 
-function updateZoomButtons() {
-  zoomOutBtn.disabled = currentZoom <= minZoom;
-  zoomInBtn.disabled = currentZoom >= maxZoom;
-}
-
-async function zoomIn(centerX = null, centerY = null) {
-  if (currentZoom < maxZoom) {
-    await zoomTo(Math.min(currentZoom + 0.25, maxZoom), centerX, centerY);
-  }
-}
-
-async function zoomOut(centerX = null, centerY = null) {
-  if (currentZoom > minZoom) {
-    await zoomTo(Math.max(currentZoom - 0.25, minZoom), centerX, centerY);
-  }
-}
-
-async function zoomTo(newZoom, centerX = null, centerY = null) {
-  if (!pdfDocument) return;
-  
-  const oldZoom = currentZoom;
-  currentZoom = newZoom;
-  
-  // If zoom position is specified, adjust pan offset to zoom towards that point
-  if (centerX !== null && centerY !== null) {
-    const canvas = pdfCanvas;
-    const container = canvas.parentElement;
-    const rect = container.getBoundingClientRect();
-    
-    // Calculate relative position within the container
-    const relativeX = centerX - rect.left;
-    const relativeY = centerY - rect.top;
-    
-    // Calculate how much the zoom center should move
-    const zoomFactor = newZoom / oldZoom;
-    const deltaX = (relativeX - container.clientWidth / 2) * (zoomFactor - 1);
-    const deltaY = (relativeY - container.clientHeight / 2) * (zoomFactor - 1);
-    
-    // Adjust pan offset
-    panOffsetX -= deltaX;
-    panOffsetY -= deltaY;
-  } else if (newZoom === 1.0) {
-    // Reset pan when zoom is reset
+async function zoomOut() {
+  currentZoom = Math.max(currentZoom / 1.2, 0.5);
+  // Reset pan when zooming out to 100% or less
+  if (currentZoom <= 1.0) {
     panOffsetX = 0;
     panOffsetY = 0;
   }
-  
-  updateZoomIndicator();
-  updateZoomButtons();
-  updateCanvasCursor();
   await renderPage(currentPage);
+  updatePageInfo();
 }
 
-async function resetZoom() {
-  await zoomTo(1.0);
+async function zoomReset() {
+  currentZoom = 1.0;
+  panOffsetX = 0;
+  panOffsetY = 0;
+  await renderPage(currentPage);
+  updatePageInfo();
 }
 
-// Remove the old updatePDFPage function as it's no longer needed
-// PDF rendering is now handled directly by renderPage()
+// Event listeners for PDF navigation
+prevPageBtn.addEventListener('click', goToPreviousPage);
+nextPageBtn.addEventListener('click', goToNextPage);
+zoomInBtn.addEventListener('click', zoomIn);
+zoomOutBtn.addEventListener('click', zoomOut);
+zoomInfo.addEventListener('click', zoomReset);
 
 // Notes management
 function clearAllNotes() {
@@ -405,14 +322,6 @@ function loadCurrentPageNote(autoFocus = false) {
   // Set textarea content
   noteTextarea.value = noteContent;
   
-  // Verification: ensure textarea content matches what we loaded
-  setTimeout(() => {
-    if (noteTextarea.value !== noteContent) {
-      console.warn(`⚠️  Load verification failed! Re-setting page ${currentPage} content`);
-      noteTextarea.value = noteContent;
-    }
-  }, 50);
-  
   // Update preview based on content
   updateNotePreview(noteContent);
   
@@ -425,8 +334,11 @@ function loadCurrentPageNote(autoFocus = false) {
   if (autoFocus) {
     setTimeout(() => {
       enterEditMode();
-    }, 100); // Small delay to ensure DOM is ready
+    }, 100);
   }
+  
+  // Update current page indicator
+  currentPageNotesSpan.textContent = currentPage;
 }
 
 // Helper function to update note preview
@@ -450,131 +362,62 @@ function enterEditMode() {
 }
 
 function exitEditMode() {
-  isEditingNote = false;
   saveCurrentNote();
-  
-  // Get the updated content after saving
-  const noteContent = notes[currentPage] || "";
-  updateNotePreview(noteContent);
-  
-  notePreview.classList.remove("d-none");
+  isEditingNote = false;
   noteTextarea.classList.add("d-none");
+  notePreview.classList.remove("d-none");
+  updateNotePreview(noteTextarea.value);
 }
 
-// Event listeners for navigation
-prevPageBtn.addEventListener("click", async () => {
-  if (currentPage > 1) {
-    await goToPage(currentPage - 1, false); // No auto-focus for button clicks
-  }
-});
-
-nextPageBtn.addEventListener("click", async () => {
-  if (currentPage < totalPages) {
-    await goToPage(currentPage + 1, false); // No auto-focus for button clicks
-  }
-});
-
-// Page input event listeners
-pageInput.addEventListener("change", async (e) => {
-  const targetPage = parseInt(e.target.value);
-  if (targetPage && targetPage >= 1 && targetPage <= totalPages && targetPage !== currentPage) {
-    await goToPage(targetPage, false);
-  } else {
-    // Revert to current page if invalid input
-    pageInput.value = currentPage;
-  }
-});
-
-pageInput.addEventListener("keydown", async (e) => {
-  if (e.key === "Enter") {
-    const targetPage = parseInt(e.target.value);
-    if (targetPage && targetPage >= 1 && targetPage <= totalPages && targetPage !== currentPage) {
-      await goToPage(targetPage, false);
-    } else {
-      // Revert to current page if invalid input
-      pageInput.value = currentPage;
-    }
-    e.target.blur(); // Remove focus from input
-  }
-});
-
-// Zoom event listeners
-zoomInBtn.addEventListener("click", zoomIn);
-zoomOutBtn.addEventListener("click", zoomOut);
-zoomResetBtn.addEventListener("click", resetZoom);
-
-// Mouse wheel zoom on PDF canvas
-pdfCanvas.addEventListener("wheel", async (e) => {
-  if (e.ctrlKey || e.metaKey) { // Ctrl+wheel or Cmd+wheel for zoom
-    e.preventDefault();
-    
-    if (e.deltaY < 0) { // Scroll up = zoom in
-      await zoomIn(e.clientX, e.clientY);
-    } else { // Scroll down = zoom out
-      await zoomOut(e.clientX, e.clientY);
-    }
-  }
-});
-
-// Mouse panning on PDF canvas
-pdfCanvas.addEventListener("mousedown", (e) => {
-  if (currentZoom > 1.0 && e.button === 0) { // Left mouse button and zoomed in
-    isPanning = true;
-    panStartX = e.clientX - panOffsetX;
-    panStartY = e.clientY - panOffsetY;
-    pdfCanvas.style.cursor = 'grabbing';
-    e.preventDefault();
-  }
-});
-
-document.addEventListener("mousemove", async (e) => {
-  if (isPanning) {
-    panOffsetX = e.clientX - panStartX;
-    panOffsetY = e.clientY - panStartY;
-    
-    // Apply the transform immediately for smooth panning
-    pdfCanvas.style.transform = `translate(${panOffsetX}px, ${panOffsetY}px)`;
-  }
-});
-
-document.addEventListener("mouseup", () => {
-  if (isPanning) {
-    isPanning = false;
-    pdfCanvas.style.cursor = currentZoom > 1.0 ? 'grab' : 'default';
-  }
-});
-
-// Update cursor based on zoom level
-function updateCanvasCursor() {
-  if (currentZoom > 1.0) {
-    pdfCanvas.style.cursor = 'grab';
-  } else {
-    pdfCanvas.style.cursor = 'default';
-  }
+// Manual page navigation for notes
+async function goToPage(page) {
+  if (page < 1 || page > totalPages) return;
+  
+  saveCurrentNote();
+  currentPage = page;
+  await renderPage(currentPage);
+  updatePageInfo();
+  updateNavigationButtons();
+  loadCurrentPageNote();
 }
-
-// Remove manual page setting since we auto-detect from PDF
-// setPagesBtn functionality is no longer needed as pages are auto-detected from PDF
 
 // Event listeners for notes
 notePreview.addEventListener("click", enterEditMode);
 
-noteTextarea.addEventListener("blur", exitEditMode);
+noteTextarea.addEventListener("blur", () => {
+  exitEditMode();
+});
 
-// Auto-save while typing (debounced)
+// Auto-save while typing
 let saveTimeout;
 noteTextarea.addEventListener("input", () => {
   clearTimeout(saveTimeout);
   saveTimeout = setTimeout(() => {
-    if (isEditingNote) {
-      saveCurrentNote();
-    }
-  }, 1000); // Save after 1 second of no typing
+    saveCurrentNote();
+  }, 1000);
 });
 
-// Handle keyboard navigation while editing
-
-noteTextarea.addEventListener("keydown", async (e) => {
+// Keyboard shortcuts
+document.addEventListener("keydown", (e) => {
+  // Zoom controls with Ctrl++, Ctrl+-, and Ctrl+0
+  if (e.ctrlKey && (e.key === '+' || e.key === '=')) {
+    e.preventDefault();
+    zoomIn();
+    return;
+  }
+  
+  if (e.ctrlKey && e.key === '-') {
+    e.preventDefault();
+    zoomOut();
+    return;
+  }
+  
+  if (e.ctrlKey && e.key === '0') {
+    e.preventDefault();
+    zoomReset();
+    return;
+  }
+  
   // Save with Ctrl+S
   if (e.ctrlKey && e.key === 's') {
     e.preventDefault();
@@ -582,159 +425,75 @@ noteTextarea.addEventListener("keydown", async (e) => {
     showSaveConfirmation();
     return;
   }
-
-  // Intercept Ff or Ctrl+r for refresh prevention
-  if (e.key === 'F5' || (e.ctrlKey && e.key.toLowerCase() === 'r')) {
+  
+  // Exit edit mode with Escape
+  if (e.key === "Escape" && isEditingNote) {
     e.preventDefault();
-    console.log("Prevented page refresh (F5 or Ctrl+R) while editing");
-    return;
-  }
-  
-  // Allow standard editing shortcuts (Ctrl+Z, Ctrl+Y, Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X)
-  if (e.ctrlKey && ['z', 'y', 'a', 'c', 'v', 'x'].includes(e.key.toLowerCase())) {
-    // Let these through without interference
-    return;
-  }
-  
-  // Navigate pages while editing with Ctrl+Arrow keys
-  if (e.ctrlKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
-    e.preventDefault();
-    
-    let targetPage = currentPage;
-    if (e.key === 'ArrowLeft' && currentPage > 1) {
-      targetPage = currentPage - 1;
-    } else if (e.key === 'ArrowRight' && currentPage < totalPages) {
-      targetPage = currentPage + 1;
-    }
-    
-    if (targetPage !== currentPage) {
-      await goToPage(targetPage, true); // Keep auto-focus enabled
-    }
-    return;
-  }
-  
-  // Alternative navigation with Alt+Arrow keys (for those who prefer Alt)
-  if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
-    e.preventDefault();
-    
-    let targetPage = currentPage;
-    if (e.key === 'ArrowLeft' && currentPage > 1) {
-      targetPage = currentPage - 1;
-    } else if (e.key === 'ArrowRight' && currentPage < totalPages) {
-      targetPage = currentPage + 1;
-    }
-    
-    if (targetPage !== currentPage) {
-      await goToPage(targetPage, true); // Keep auto-focus enabled
-    }
-    return;
-  }
-});
-
-// Keyboard shortcuts
-document.addEventListener("keydown", async (e) => {
-  // Only handle shortcuts if not editing a note and not in an input field
-  if (!isEditingNote && !e.target.matches('input, textarea')) {
-    switch(e.key) {
-      case 'ArrowLeft':
-        e.preventDefault();
-        if (currentPage > 1) {
-          await goToPage(currentPage - 1, true); // Auto-focus enabled
-        }
-        break;
-      case 'ArrowRight':
-        e.preventDefault();
-        if (currentPage < totalPages) {
-          await goToPage(currentPage + 1, true); // Auto-focus enabled
-        }
-        break;
-
-    }
-  }
-  
-  // Escape key to exit edit mode
-  if (e.key === 'Escape' && isEditingNote) {
     exitEditMode();
+    return;
   }
   
-  // Enter key to start editing (when not in edit mode)
-  if (e.key === 'Enter' && !isEditingNote && !e.target.matches('input, textarea, button')) {
+  // Enter edit mode with Enter (when not editing)
+  if (e.key === "Enter" && !isEditingNote) {
     e.preventDefault();
     enterEditMode();
-  }
-  
-  // Ctrl+S to save notes manually
-  if (e.ctrlKey && e.key === 's') {
-    e.preventDefault();
-    saveCurrentNote();
-    
-    // Show a brief save confirmation
-    showSaveConfirmation();
-  }
-  
-  // Prevent page refresh with F5 or Ctrl+R globally
-  if (e.key === 'F5' || (e.ctrlKey && e.key.toLowerCase() === 'r')) {
-    e.preventDefault();
-    console.log("Prevented page refresh (F5 or Ctrl+R) - global listener");
     return;
+  }
+  
+  // Page navigation with arrow keys (when not editing)
+  if (!isEditingNote) {
+    if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      goToPage(currentPage - 1);
+    } else if (e.key === "ArrowRight") {
+      e.preventDefault();
+      goToPage(currentPage + 1);
+    }
+  }
+  
+  // Page navigation with Ctrl+Arrow (even when editing)
+  if (e.ctrlKey) {
+    if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      goToPage(currentPage - 1);
+    } else if (e.key === "ArrowRight") {
+      e.preventDefault();
+      goToPage(currentPage + 1);
+    }
   }
 });
 
-// File operations
+// Load notes functionality
+loadNotesInput.addEventListener("change", () => {
+  const file = loadNotesInput.files[0];
+  if (file && file.name.endsWith('.ezn')) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const loadedNotes = JSON.parse(e.target.result);
+        notes = loadedNotes;
+        loadCurrentPageNote();
+        alert("Notes loaded successfully!");
+      } catch (error) {
+        alert("Error loading notes: " + error.message);
+      }
+    };
+    reader.readAsText(file);
+  }
+});
+
 loadNotesBtn.addEventListener("click", () => {
   loadNotesInput.click();
 });
 
-loadNotesInput.addEventListener("change", () => {
-  const file = loadNotesInput.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = async (e) => {
-    try {
-      const data = JSON.parse(e.target.result);
-      if (data.notes && typeof data.notes === 'object') {
-        notes = data.notes;
-        
-        // Update total pages if loaded from notes (only if no PDF is loaded)
-        if (data.totalPages && !pdfDocument) {
-          totalPages = data.totalPages;
-        }
-        
-        // Restore last page if available
-        if (data.lastPage && data.lastPage <= totalPages) {
-          await goToPage(data.lastPage);
-        }
-        
-        // Update current view
-        updatePageIndicator();
-        updateNavigationButtons();
-        loadCurrentPageNote();
-        
-        alert("Notes loaded successfully!");
-      }
-    } catch (err) {
-      alert("Error loading notes file: " + err.message);
-    }
-  };
-  reader.readAsText(file);
-});
-
+// Save notes functionality
 saveNotesBtn.addEventListener("click", () => {
-  // Save current note before saving file
   saveCurrentNote();
   
-  const data = {
-    notes: notes,
-    totalPages: totalPages,
-    lastPage: currentPage
-  };
-
-  const blob = new Blob([JSON.stringify(data, null, 2)], {
-    type: "application/json",
-  });
+  const notesData = JSON.stringify(notes, null, 2);
+  const blob = new Blob([notesData], { type: "application/json" });
   const url = URL.createObjectURL(blob);
-
+  
   const a = document.createElement("a");
   a.href = url;
   a.download = selectedFile + ".ezn";
@@ -743,84 +502,53 @@ saveNotesBtn.addEventListener("click", () => {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
   
-  alert("Notes saved successfully!");
+  showSaveConfirmation();
 });
 
+// Close notes functionality
 closeBtn.addEventListener("click", () => {
   if (Object.keys(notes).length > 0) {
     const confirmClose = confirm("You have unsaved notes. Are you sure you want to close?");
     if (!confirmClose) return;
   }
   
-  // Reset PDF state
-  if (pdfDocument) {
-    pdfDocument = null;
-  }
-  
-  // Reset UI
+  // Reset state
   selectedFile = "new_notes";
   notes = {};
   currentPage = 1;
   totalPages = 1;
-  currentZoom = 1.0; // Reset zoom
-  panOffsetX = 0; // Reset pan
-  panOffsetY = 0;
+  currentZoom = 1.0;
+  
+  // Clean up PDF document
+  if (pdfDocument) {
+    pdfDocument = null;
+  }
   
   // Hide PDF and show placeholder
-  pdfCanvas.style.display = 'none';
+  pdfViewer.style.display = 'none';
   pdfPlaceholder.style.display = 'block';
   pdfInfo.style.display = 'none';
   
   // Reset file input
   input.value = '';
   
-  updatePageIndicator();
-  updateNavigationButtons();
-  updateZoomIndicator();
-  updateZoomButtons();
-  loadCurrentPageNote();
-  showSyncStatus(true);
+  // Clear notes display
+  clearAllNotes();
+  
+  // Update page indicator
+  currentPageNotesSpan.textContent = currentPage;
 });
 
-// Handle window resize for PDF re-rendering
-window.addEventListener('resize', debounce(async () => {
-  if (pdfDocument && !renderingPage) {
-    await renderPage(currentPage);
-  }
-}, 300));
-
-// Debounce function to limit resize event frequency
-function debounce(func, wait) {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
-}
-
-// Save notes before leaving the page
-window.addEventListener("beforeunload", (e) => {
-  saveCurrentNote();
-});
-
-// Save notes when page becomes hidden (user switches tabs, etc.)
+// Auto-save on page visibility change
 document.addEventListener("visibilitychange", () => {
-  if (document.hidden) {
+  if (document.visibilityState === "hidden" && isEditingNote) {
     saveCurrentNote();
   }
 });
 
 // Initialize app when page loads
 document.addEventListener("DOMContentLoaded", function() {
-  // Check if all required libraries are loaded
-  if (typeof pdfjsLib === 'undefined') {
-    console.error('PDF.js library not loaded');
-    return;
-  }
+  // Check if marked library is loaded
   if (typeof marked === 'undefined') {
     console.error('Marked library not loaded');
     return;
