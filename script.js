@@ -573,12 +573,20 @@ noteTextarea.addEventListener("input", () => {
 });
 
 // Handle keyboard navigation while editing
+
 noteTextarea.addEventListener("keydown", async (e) => {
   // Save with Ctrl+S
   if (e.ctrlKey && e.key === 's') {
     e.preventDefault();
     saveCurrentNote();
     showSaveConfirmation();
+    return;
+  }
+
+  // Intercept Ff or Ctrl+r for refresh prevention
+  if (e.key === 'F5' || (e.ctrlKey && e.key.toLowerCase() === 'r')) {
+    e.preventDefault();
+    console.log("Prevented page refresh (F5 or Ctrl+R) while editing");
     return;
   }
   
@@ -662,6 +670,13 @@ document.addEventListener("keydown", async (e) => {
     
     // Show a brief save confirmation
     showSaveConfirmation();
+  }
+  
+  // Prevent page refresh with F5 or Ctrl+R globally
+  if (e.key === 'F5' || (e.ctrlKey && e.key.toLowerCase() === 'r')) {
+    e.preventDefault();
+    console.log("Prevented page refresh (F5 or Ctrl+R) - global listener");
+    return;
   }
 });
 
