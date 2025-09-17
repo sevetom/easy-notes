@@ -1,5 +1,24 @@
 // Configure PDF.js
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+if (typeof pdfjsLib !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  
+  // Set additional PDF.js options to prevent errors
+  pdfjsLib.GlobalWorkerOptions.isEvalSupported = false;
+} else {
+  console.error('PDF.js library not loaded properly');
+}
+
+// Global error handler
+window.addEventListener('error', function(event) {
+  console.error('Global error:', event.error);
+  console.error('Error at line:', event.lineno, 'column:', event.colno);
+  console.error('File:', event.filename);
+});
+
+// Handle unhandled promise rejections
+window.addEventListener('unhandledrejection', function(event) {
+  console.error('Unhandled promise rejection:', event.reason);
+});
 
 // DOM Elements
 const input = document.getElementById("file-input");
@@ -136,9 +155,22 @@ function showSaveConfirmation() {
 // PDF file handling with PDF.js
 input.addEventListener("change", async function () {
   const file = input.files[0];
+  
+  // Check if there are unsaved notes before opening a new PDF
+  if (file && file.type === "application/pdf" && Object.keys(notes).length > 0) {
+    const confirmOpen = confirm("You have unsaved notes. Opening a new PDF will clear all current notes. Are you sure you want to continue?");
+    if (!confirmOpen) {
+      // Reset the file input if user cancels
+      input.value = '';
+      return;
+    }
+  }
+  
   selectedFile = file ? file.name.replace(/\.pdf$/i, "") : "new_notes";
   
   if (file && file.type === "application/pdf") {
+    // Clear all existing notes when opening a new PDF
+    clearAllNotes();
     await loadPDF(file);
   }
 });
@@ -173,8 +205,6 @@ async function loadPDF(file) {
     pdfLoading.style.display = 'none';
     pdfCanvas.style.display = 'block';
     showSyncStatus(true);
-    
-    console.log(`PDF loaded: ${totalPages} pages`);
   } catch (error) {
     console.error('Error loading PDF:', error);
     alert('Error loading PDF: ' + error.message);
@@ -254,8 +284,6 @@ async function goToPage(page, autoFocus = false) {
     notes[previousPage] = textareaContent;
   }
   
-  console.log(`🔄 Switching from page ${previousPage} to page ${page}${autoFocus ? ' (with auto-focus)' : ''}`);
-  
   currentPage = page;
   
   // Render the new page if PDF is loaded
@@ -267,8 +295,6 @@ async function goToPage(page, autoFocus = false) {
   updatePageIndicator();
   updateNavigationButtons();
   loadCurrentPageNote(autoFocus);
-  
-  console.log(`✅ Successfully navigated to page ${currentPage}`);
 }
 
 function updatePageIndicator() {
@@ -339,19 +365,29 @@ async function zoomTo(newZoom, centerX = null, centerY = null) {
   updateZoomButtons();
   updateCanvasCursor();
   await renderPage(currentPage);
-  
-  console.log(`Zoomed to ${Math.round(currentZoom * 100)}%`);
 }
 
 async function resetZoom() {
   await zoomTo(1.0);
-  console.log('Zoom reset to 100%');
 }
 
 // Remove the old updatePDFPage function as it's no longer needed
 // PDF rendering is now handled directly by renderPage()
 
 // Notes management
+function clearAllNotes() {
+  notes = {}; // Clear all notes
+  
+  // Clear the current display
+  noteTextarea.value = "";
+  updateNotePreview("");
+  
+  // Exit edit mode if active
+  if (isEditingNote) {
+    exitEditMode();
+  }
+}
+
 function saveCurrentNote() {
   // Always save the current content of the textarea
   const currentContent = noteTextarea.value || "";
@@ -360,17 +396,11 @@ function saveCurrentNote() {
   // Only update if content has actually changed
   if (currentContent !== previousContent) {
     notes[currentPage] = currentContent;
-    console.log(`✅ Updated note for page ${currentPage}:`, currentContent.substring(0, 50) + (currentContent.length > 50 ? "..." : ""));
-  } else {
-    console.log(`📝 Note for page ${currentPage} unchanged`);
   }
 }
 
 function loadCurrentPageNote(autoFocus = false) {
   const noteContent = notes[currentPage] || "";
-  
-  // Debug log
-  console.log(`📖 Loading note for page ${currentPage}:`, noteContent.substring(0, 50) + (noteContent.length > 50 ? "..." : ""));
   
   // Set textarea content
   noteTextarea.value = noteContent;
@@ -417,8 +447,6 @@ function enterEditMode() {
   // Position cursor at the end of existing text
   const length = noteTextarea.value.length;
   noteTextarea.setSelectionRange(length, length);
-  
-  console.log("Entered edit mode for page", currentPage);
 }
 
 function exitEditMode() {
@@ -540,7 +568,6 @@ noteTextarea.addEventListener("input", () => {
   saveTimeout = setTimeout(() => {
     if (isEditingNote) {
       saveCurrentNote();
-      console.log("Auto-saved note while typing");
     }
   }, 1000); // Save after 1 second of no typing
 });
@@ -552,7 +579,6 @@ noteTextarea.addEventListener("keydown", async (e) => {
     e.preventDefault();
     saveCurrentNote();
     showSaveConfirmation();
-    console.log("Manual save with Ctrl+S in textarea");
     return;
   }
   
@@ -574,7 +600,6 @@ noteTextarea.addEventListener("keydown", async (e) => {
     }
     
     if (targetPage !== currentPage) {
-      console.log(`Navigating from page ${currentPage} to ${targetPage} while editing`);
       await goToPage(targetPage, true); // Keep auto-focus enabled
     }
     return;
@@ -592,7 +617,6 @@ noteTextarea.addEventListener("keydown", async (e) => {
     }
     
     if (targetPage !== currentPage) {
-      console.log(`Navigating from page ${currentPage} to ${targetPage} while editing (Alt+Arrow)`);
       await goToPage(targetPage, true); // Keep auto-focus enabled
     }
     return;
@@ -635,7 +659,6 @@ document.addEventListener("keydown", async (e) => {
   if (e.ctrlKey && e.key === 's') {
     e.preventDefault();
     saveCurrentNote();
-    console.log("Manual save with Ctrl+S (global)");
     
     // Show a brief save confirmation
     showSaveConfirmation();
@@ -767,16 +790,27 @@ function debounce(func, wait) {
 // Save notes before leaving the page
 window.addEventListener("beforeunload", (e) => {
   saveCurrentNote();
-  console.log("Auto-saved before page unload");
 });
 
 // Save notes when page becomes hidden (user switches tabs, etc.)
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
     saveCurrentNote();
-    console.log("Auto-saved on visibility change");
   }
 });
 
 // Initialize app when page loads
-document.addEventListener("DOMContentLoaded", initializeApp);
+document.addEventListener("DOMContentLoaded", function() {
+  // Check if all required libraries are loaded
+  if (typeof pdfjsLib === 'undefined') {
+    console.error('PDF.js library not loaded');
+    return;
+  }
+  if (typeof marked === 'undefined') {
+    console.error('Marked library not loaded');
+    return;
+  }
+  
+  // Initialize the app
+  initializeApp();
+});
