@@ -652,13 +652,13 @@ async function goToPage(page, autoFocus = false) {
   // Double-check: always save current note content before switching
   saveCurrentNote();
   
-  // Additional safety: verify the save worked correctly
-  const savedContent = notes[previousPage] || "";
-  const textareaContent = noteTextarea.value || "";
-  if (savedContent !== textareaContent) {
-    console.warn(`⚠️  Save verification failed! Re-saving page ${previousPage}`);
-    notes[previousPage] = textareaContent;
-  }
+  // // Additional safety: verify the save worked correctly
+  // const savedContent = notes[previousPage] || "";
+  // const textareaContent = noteTextarea.value || "";
+  // if (savedContent !== textareaContent) {
+  //   console.warn(`⚠️  Save verification failed! Re-saving page ${previousPage}`);
+  //   notes[previousPage] = textareaContent;
+  // }
   
   currentPage = page;
   
@@ -763,16 +763,8 @@ function saveCurrentNote() {
 function loadCurrentPageNote(autoFocus = false) {
   const noteContent = notes[currentPage] || "";
   
-  // Set textarea content
+  // Set textarea content directly without verification timeout
   noteTextarea.value = noteContent;
-  
-  // Verification: ensure textarea content matches what we loaded
-  setTimeout(() => {
-    if (noteTextarea.value !== noteContent) {
-      console.warn(`⚠️  Load verification failed! Re-setting page ${currentPage} content`);
-      noteTextarea.value = noteContent;
-    }
-  }, 50);
   
   // Update preview based on content
   updateNotePreview(noteContent);
@@ -986,9 +978,13 @@ loadNotesInput.addEventListener("change", async () => {
     try {
       const data = JSON.parse(e.target.result);
       
+      // Clear current notes first to avoid conflicts
+      notes = {};
+      
       // Handle both old format (direct notes object) and new format (with metadata)
       if (data.notes && typeof data.notes === 'object') {
-        notes = data.notes;
+        // Deep copy to avoid reference issues
+        notes = JSON.parse(JSON.stringify(data.notes));
         
         // Update total pages if loaded from notes (only if no PDF is loaded)
         if (data.totalPages && !pdfDocument) {
@@ -998,16 +994,21 @@ loadNotesInput.addEventListener("change", async () => {
         // Restore last page if available
         if (data.lastPage && data.lastPage <= totalPages) {
           await goToPage(data.lastPage);
+        } else {
+          // Just reload current page to ensure sync
+          loadCurrentPageNote();
         }
       } else {
         // Old format - data is directly the notes object
-        notes = data;
+        notes = JSON.parse(JSON.stringify(data));
+        loadCurrentPageNote();
       }
       
       // Update current view
       updatePageInfo();
       updateNavigationButtons();
-      loadCurrentPageNote();
+      
+      console.log(`📂 Loaded notes file with ${Object.keys(notes).length} pages of notes`);
       
     } catch (err) {
       alert("Error loading notes file: " + err.message);
