@@ -857,6 +857,7 @@ noteTextarea.addEventListener("keydown", async (e) => {
   // Navigate pages while editing with Ctrl+Arrow keys
   if (e.ctrlKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
     e.preventDefault();
+    e.stopPropagation(); // Prevent event from bubbling up to document handler
     
     let targetPage = currentPage;
     if (e.key === 'ArrowLeft' && currentPage > 1) {
@@ -866,24 +867,28 @@ noteTextarea.addEventListener("keydown", async (e) => {
     }
     
     if (targetPage !== currentPage) {
-      await goToPage(targetPage, true); // Keep auto-focus enabled
-    }
-    return;
-  }
-  
-  // Alternative navigation with Alt+Arrow keys (for those who prefer Alt)
-  if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
-    e.preventDefault();
-    
-    let targetPage = currentPage;
-    if (e.key === 'ArrowLeft' && currentPage > 1) {
-      targetPage = currentPage - 1;
-    } else if (e.key === 'ArrowRight' && currentPage < totalPages) {
-      targetPage = currentPage + 1;
-    }
-    
-    if (targetPage !== currentPage) {
-      await goToPage(targetPage, true); // Keep auto-focus enabled
+      // Save current note before switching pages
+      saveCurrentNote();
+      
+      const previousPage = currentPage;
+      currentPage = targetPage;
+      
+      // Render the new page if PDF is loaded
+      if (pdfDocument) {
+        await renderPage(currentPage);
+      }
+      
+      // Update UI
+      updatePageInfo();
+      updateNavigationButtons();
+      
+      // Load the note for the new page without exiting edit mode
+      const noteContent = notes[currentPage] || "";
+      noteTextarea.value = noteContent;
+      updateNotePreview(noteContent);
+      
+      // Keep focus on textarea to maintain editing mode
+      noteTextarea.focus();
     }
     return;
   }
