@@ -925,13 +925,13 @@ document.addEventListener("keydown", async (e) => {
       case "ArrowLeft":
         e.preventDefault();
         if (currentPage > 1) {
-          await goToPage(currentPage - 1, true); // Auto-focus enabled
+          await goToPage(currentPage - 1);
         }
         break;
       case "ArrowRight":
         e.preventDefault();
         if (currentPage < totalPages) {
-          await goToPage(currentPage + 1, true); // Auto-focus enabled
+          await goToPage(currentPage + 1);
         }
         break;
     }
@@ -973,23 +973,6 @@ document.addEventListener("keydown", async (e) => {
     e.preventDefault();
     saveCurrentNote();
     showSaveConfirmation();
-    return;
-  }
-
-  // Page navigation with Ctrl+Arrow (even when editing - handled above in textarea listener)
-  if (e.ctrlKey && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
-    e.preventDefault();
-
-    let targetPage = currentPage;
-    if (e.key === "ArrowLeft" && currentPage > 1) {
-      targetPage = currentPage - 1;
-    } else if (e.key === "ArrowRight" && currentPage < totalPages) {
-      targetPage = currentPage + 1;
-    }
-
-    if (targetPage !== currentPage) {
-      await goToPage(targetPage, isEditingNote); // Auto-focus if editing
-    }
     return;
   }
 });
