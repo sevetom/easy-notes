@@ -1,4 +1,5 @@
-html, body {
+html,
+body {
   height: 100%;
   margin: 0;
   padding: 0;
@@ -147,7 +148,7 @@ html, body {
   margin: 0;
 }
 
-.page-input-field[type=number] {
+.page-input-field[type="number"] {
   -moz-appearance: textfield;
   appearance: textfield;
 }
@@ -203,7 +204,7 @@ html, body {
   bottom: 0;
   overflow: hidden;
   opacity: 0.2;
-  line-height: 1.0;
+  line-height: 1;
 }
 
 .textLayer > span {
@@ -415,7 +416,7 @@ html, body {
   margin: 0;
 }
 
-.page-input[type=number] {
+.page-input[type="number"] {
   -moz-appearance: textfield;
   appearance: textfield;
 }
@@ -481,7 +482,7 @@ html, body {
 #note-textarea {
   flex: 1;
   resize: none;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
   font-size: 1em;
   line-height: 1.6;
   border: 0.125rem solid #ced4da;
@@ -593,24 +594,24 @@ html, body {
   .pdf-overlay {
     padding: 0.1875rem 0.5rem;
   }
-  
+
   .pdf-controls-container {
     flex-direction: row;
     justify-content: space-between;
     gap: 0.625rem;
     padding: 0 0.3125rem;
   }
-  
+
   .page-navigation {
     gap: 0.375rem;
     flex: 1;
     justify-content: center;
   }
-  
+
   .zoom-controls {
     gap: 0.25rem;
   }
-  
+
   .nav-btn {
     min-width: 4.0625rem;
     height: 1.75rem;
@@ -623,7 +624,7 @@ html, body {
     border-radius: 0.1875rem;
     white-space: nowrap;
   }
-  
+
   .zoom-btn {
     width: 1.625rem;
     height: 1.625rem;
@@ -635,24 +636,24 @@ html, body {
     line-height: 1;
     border-radius: 0.1875rem;
   }
-  
+
   .page-input-container {
     font-size: 0.6875em;
     height: 1.75rem;
     gap: 0.25rem;
   }
-  
+
   .page-input {
     width: 2.5rem;
     height: 1.5rem;
     font-size: 0.75em;
     padding: 0 0.125rem;
   }
-  
+
   .page-label {
     font-size: 0.6875em;
   }
-  
+
   .zoom-info {
     font-size: 0.625em;
     min-width: 2.375rem;
