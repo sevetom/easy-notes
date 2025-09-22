@@ -23,7 +23,6 @@ window.addEventListener("unhandledrejection", function (event) {
 
 // DOM Elements
 const input = document.getElementById("file-input");
-const loadNotesBtn = document.getElementById("load-notes-btn");
 const saveNotesBtn = document.getElementById("save-notes-btn");
 const loadNotesInput = document.getElementById("load-notes-input");
 const closeBtn = document.getElementById("close-btn");
@@ -1017,18 +1016,14 @@ loadNotesInput.addEventListener("change", async () => {
       updatePageInfo();
       updateNavigationButtons();
 
-      console.log(
-        `📂 Loaded notes file with ${Object.keys(notes).length} pages of notes`
-      );
     } catch (err) {
       alert("Error loading notes file: " + err.message);
     }
+    
+    // Reset input to allow reloading the same file
+    loadNotesInput.value = '';
   };
   reader.readAsText(file);
-});
-
-loadNotesBtn.addEventListener("click", () => {
-  loadNotesInput.click();
 });
 
 // Save notes functionality

@@ -18,14 +18,40 @@
 
 <body>
 
-    <nav class="navbar navbar-dark bg-dark">
+    <nav class="navbar navbar-dark bg-dark shadow-sm">
         <div class="container-fluid">
-            <span class="navbar-brand">Easy Notes</span>
-            <input type="file" id="file-input" accept="application/pdf" class="btn btn-light">
-            <input type="file" id="load-notes-input" accept=".ezn" class="btn btn-secondary">
-            <button id="load-notes-btn" class="btn btn-secondary">Load Notes</button>
-            <button id="save-notes-btn" class="btn btn-success">Save Notes</button>
-            <button id="close-btn" class="btn btn-danger">Close Notes</button>
+            <!-- Brand with icon -->
+            <a class="navbar-brand d-flex align-items-center" href="#">
+                <i class="fas fa-sticky-note me-2"></i>
+                <span>Easy Notes</span>
+            </a>
+
+            <!-- Main navigation content -->
+            <div class="d-flex align-items-center gap-2 ms-auto">
+                <!-- PDF Upload -->
+                <label for="file-input" class="btn btn-outline-light btn-sm d-flex align-items-center">
+                    <i class="fas fa-file-pdf me-1"></i>
+                    <span class="d-none d-md-inline">Load PDF</span>
+                </label>
+                <input type="file" id="file-input" accept="application/pdf" class="d-none">
+
+                <!-- Notes Management -->
+                <label for="load-notes-input" class="btn btn-outline-light btn-sm d-flex align-items-center">
+                    <i class="fas fa-file-text me-1"></i>
+                    <span class="d-none d-lg-inline">Load Notes</span>
+                </label>
+                <input type="file" id="load-notes-input" accept=".ezn" class="d-none">
+                
+                <button id="save-notes-btn" class="btn btn-outline-success btn-sm d-flex align-items-center">
+                    <i class="fas fa-save me-1"></i>
+                    <span class="d-none d-lg-inline">Save</span>
+                </button>
+                
+                <button id="close-btn" class="btn btn-outline-danger btn-sm d-flex align-items-center">
+                    <i class="fas fa-times me-1"></i>
+                    <span class="d-none d-lg-inline">Close</span>
+                </button>
+            </div>
         </div>
     </nav>
 

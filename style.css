@@ -10,22 +10,45 @@ body {
 .navbar {
   padding: 0.25rem 1rem !important;
   min-height: 2.5rem !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .navbar .navbar-brand {
-  font-size: 1.1em;
-  margin-right: 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-right: auto;
+}
+
+.navbar .navbar-brand i {
+  font-size: 1rem;
 }
 
 .navbar .btn {
   padding: 0.25rem 0.5rem;
-  font-size: 0.875em;
-  margin-left: 0.25rem;
+  font-size: 0.875rem;
+  border-width: 1px;
+  transition: all 0.2s ease-in-out;
+}
+
+.navbar .btn:hover {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Make Load Notes button more visible */
+.navbar label.btn-outline-light {
+  border-color: rgba(255, 255, 255, 0.75);
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+}
+
+.navbar label.btn-outline-light:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 1);
+  color: white;
 }
 
 .navbar input[type="file"] {
-  padding: 0.25rem 0.5rem;
-  font-size: 0.875em;
+  display: none;
 }
 
 .main-content-row {
@@ -664,5 +687,40 @@ body {
     justify-content: center;
     line-height: 1;
     border-radius: 0.1875rem;
+  }
+}
+
+/* Responsive navbar improvements */
+@media (max-width: 768px) {
+  .navbar {
+    padding: 0.2rem 0.5rem !important;
+    min-height: 2.25rem !important;
+  }
+  
+  .navbar .navbar-brand {
+    font-size: 1rem;
+  }
+  
+  .navbar .btn {
+    padding: 0.2rem 0.4rem;
+    font-size: 0.8rem;
+  }
+  
+  .main-content-row {
+    height: calc(100vh - 2.25rem);
+  }
+}
+
+@media (max-width: 576px) {
+  .navbar {
+    padding: 0.2rem !important;
+  }
+  
+  .navbar .navbar-brand span {
+    display: none;
+  }
+  
+  .navbar .btn {
+    padding: 0.15rem 0.3rem;
   }
 }
