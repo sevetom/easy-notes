@@ -107,12 +107,12 @@ function initializeApp() {
       </button>
     </div>
     <div class="shortcuts-help-content">
-      ← → Navigate pages (auto-focus)<br>
+      ← → Navigate pages<br>
+      Enter: Start editing | Esc: Exit<br>
       Ctrl++ Ctrl+- Ctrl+Wheel: Zoom controls<br>
-      Click on highlighted text to remove it <br>
+      Click on highlighted text to remove it<br>
       <strong>While editing:</strong><br>
       Ctrl+← → Navigate while typing<br>
-      Enter: Start editing | Esc: Exit<br>
       Ctrl+S: Save notes
     </div>
   `;
