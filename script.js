@@ -1202,6 +1202,8 @@ filesInput.addEventListener("change", async function () {
 
   // Load PDF if present
   if (pdfFile) {
+    // Set the selected file name for saving notes
+    selectedFile = pdfFile.name.replace(/\.pdf$/i, "");
     // Clear all existing notes when opening a new PDF
     clearAllNotes();
     await loadPDF(pdfFile);
