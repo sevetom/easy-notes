@@ -34,16 +34,56 @@ body {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-/* Make Load Notes button more visible */
+/* Load buttons styling - more subtle white */
 .navbar label.btn-outline-light {
-  border-color: rgba(255, 255, 255, 0.75);
-  color: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.4);
+  color: rgba(255, 255, 255, 0.6);
   cursor: pointer;
 }
 
 .navbar label.btn-outline-light:hover {
-  background-color: rgba(255, 255, 255, 0.1);
-  border-color: rgba(255, 255, 255, 1);
+  background-color: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* Files input button styling - more vibrant blue */
+.navbar label[for="files-input"] {
+  border-color: #17a2b8;
+  color: #17a2b8;
+  cursor: pointer;
+  height: calc(1.5em + 0.5rem + 2px); /* Same height as other buttons */
+  align-items: center;
+  justify-content: center;
+}
+
+.navbar label[for="files-input"]:hover {
+  background-color: #17a2b8;
+  border-color: #17a2b8;
+  color: white;
+}
+
+/* Save button styling - more vibrant green */
+.navbar #save-notes-btn {
+  border-color: #28a745;
+  color: #28a745;
+}
+
+.navbar #save-notes-btn:hover {
+  background-color: #28a745;
+  border-color: #28a745;
+  color: white;
+}
+
+/* Close button styling - more vibrant red */
+.navbar #close-btn {
+  border-color: #dc3545;
+  color: #dc3545;
+}
+
+.navbar #close-btn:hover {
+  background-color: #dc3545;
+  border-color: #dc3545;
   color: white;
 }
 

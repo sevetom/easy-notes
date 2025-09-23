@@ -22,10 +22,11 @@ window.addEventListener("unhandledrejection", function (event) {
 });
 
 // DOM Elements
-const input = document.getElementById("file-input");
+const pdfInput = document.getElementById("pdf-input");
 const saveNotesBtn = document.getElementById("save-notes-btn");
 const loadNotesInput = document.getElementById("load-notes-input");
 const closeBtn = document.getElementById("close-btn");
+const filesInput = document.getElementById("files-input");
 
 // PDF elements
 const pdfViewer = document.getElementById("pdf-viewer");
@@ -161,8 +162,8 @@ function showSaveConfirmation() {
 }
 
 // PDF file handling with PDF.js
-input.addEventListener("change", async function () {
-  const file = input.files[0];
+pdfInput.addEventListener("change", async function () {
+  const file = pdfInput.files[0];
 
   // Check if there are unsaved notes before opening a new PDF
   if (
@@ -175,7 +176,7 @@ input.addEventListener("change", async function () {
     );
     if (!confirmOpen) {
       // Reset the file input if user cancels
-      input.value = "";
+      pdfInput.value = "";
       return;
     }
   }
@@ -1116,7 +1117,7 @@ closeBtn.addEventListener("click", () => {
   if (pdfInfo) pdfInfo.style.display = "none";
 
   // Reset file input
-  input.value = "";
+  pdfInput.value = "";
 
   // Clear notes display
   clearAllNotes();
@@ -1182,4 +1183,75 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Setup panning after initialization
   setupPanning();
+});
+
+// Handle files input to load both PDF and notes when selected together
+filesInput.addEventListener("change", async function () {
+  const files = Array.from(filesInput.files);
+  let pdfFile = null;
+  let eznFile = null;
+
+  // Find PDF and .ezn files
+  for (const file of files) {
+    if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+      pdfFile = file;
+    } else if (file.name.toLowerCase().endsWith(".ezn")) {
+      eznFile = file;
+    }
+  }
+
+  // Load PDF if present
+  if (pdfFile) {
+    // Clear all existing notes when opening a new PDF
+    clearAllNotes();
+    await loadPDF(pdfFile);
+  }
+
+  // Load notes if present
+  if (eznFile) {
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
+        notes = {};
+        if (!data.notes || typeof data.notes !== "object") {
+          throw new Error("Invalid notes file format. Expected format: { notes: {...}, totalPages: ..., lastPage: ... }");
+        }
+        notes = JSON.parse(JSON.stringify(data.notes));
+        const notePageNumbers = Object.keys(notes).map(Number).filter(n => !isNaN(n) && n > 0);
+        const maxNotePageNumber = notePageNumbers.length > 0 ? Math.max(...notePageNumbers) : 0;
+        if (!pdfDocument) {
+          if (data.totalPages) {
+            totalPages = Math.max(data.totalPages, maxNotePageNumber || 1, totalPages);
+          } else {
+            totalPages = Math.max(maxNotePageNumber || 1, totalPages);
+          }
+        } else {
+          if (maxNotePageNumber > totalPages) {
+            console.log(`📝 Notes contain pages beyond PDF (${maxNotePageNumber} > ${totalPages}). All notes will be preserved.`);
+          }
+        }
+        if (data.lastPage && data.lastPage <= totalPages) {
+          if (data.lastPage === currentPage) {
+            loadCurrentPageNote();
+          } else {
+            await goToPage(data.lastPage);
+          }
+        } else {
+          loadCurrentPageNote();
+        }
+        updatePageInfo();
+        updateNavigationButtons();
+        const noteCount = Object.keys(notes).length;
+        const pdfStatus = pdfDocument ? `(PDF: ${pdfDocument.numPages} pages)` : "(No PDF)";
+        console.log(`📂 Loaded notes file with ${noteCount} pages of notes ${pdfStatus}. Total pages now: ${totalPages}`);
+      } catch (err) {
+        alert("Error loading notes file: " + err.message);
+      }
+      filesInput.value = '';
+    };
+    reader.readAsText(eznFile);
+  } else {
+    filesInput.value = '';
+  }
 });
