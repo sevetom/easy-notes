@@ -57,7 +57,7 @@ const syncIcon = document.getElementById("sync-icon");
 // Application state
 let selectedFile = "new_notes";
 let currentPage = 1;
-let totalPages = 1;
+let totalPages = 100; // Default to 100 virtual pages when no PDF is loaded
 let notes = {}; // Object to store notes for each page
 let isEditingNote = false;
 let pdfDocument = null;
@@ -655,7 +655,11 @@ function updateCanvasCursor() {
 
 // Manual page navigation for notes
 async function goToPage(page, autoFocus = false) {
-  if (page < 1 || page > totalPages || page === currentPage) return;
+  // More flexible validation: allow navigation to any positive page number
+  // but respect totalPages when there's a PDF loaded
+  const maxAllowedPage = pdfDocument ? totalPages : Math.max(totalPages, 1000); // Allow up to 1000 pages without PDF
+  
+  if (page < 1 || page > maxAllowedPage || page === currentPage) return;
 
   const previousPage = currentPage;
 
@@ -989,32 +993,54 @@ loadNotesInput.addEventListener("change", async () => {
       // Clear current notes first to avoid conflicts
       notes = {};
 
-      // Handle both old format (direct notes object) and new format (with metadata)
-      if (data.notes && typeof data.notes === "object") {
-        // Deep copy to avoid reference issues
-        notes = JSON.parse(JSON.stringify(data.notes));
+      // Only support new format with metadata
+      if (!data.notes || typeof data.notes !== "object") {
+        throw new Error("Invalid notes file format. Expected format: { notes: {...}, totalPages: ..., lastPage: ... }");
+      }
 
-        // Update total pages if loaded from notes (only if no PDF is loaded)
-        if (data.totalPages && !pdfDocument) {
-          totalPages = data.totalPages;
-        }
+      // Deep copy to avoid reference issues
+      notes = JSON.parse(JSON.stringify(data.notes));
 
-        // Restore last page if available
-        if (data.lastPage && data.lastPage <= totalPages) {
-          await goToPage(data.lastPage);
+      // Calculate the maximum page number from loaded notes
+      const notePageNumbers = Object.keys(notes).map(Number).filter(n => !isNaN(n) && n > 0);
+      const maxNotePageNumber = notePageNumbers.length > 0 ? Math.max(...notePageNumbers) : 0;
+      
+      // Update total pages based on context:
+      if (!pdfDocument) {
+        // No PDF loaded: use the larger between saved totalPages, max note page, or current totalPages
+        if (data.totalPages) {
+          totalPages = Math.max(data.totalPages, maxNotePageNumber || 1, totalPages);
         } else {
-          // Just reload current page to ensure sync
-          loadCurrentPageNote();
+          totalPages = Math.max(maxNotePageNumber || 1, totalPages);
         }
       } else {
-        // Old format - data is directly the notes object
-        notes = JSON.parse(JSON.stringify(data));
+        // PDF is loaded: keep PDF pages but ensure we can access all note pages
+        // This allows loading notes that were taken on a different PDF or without PDF
+        if (maxNotePageNumber > totalPages) {
+          console.log(`📝 Notes contain pages beyond PDF (${maxNotePageNumber} > ${totalPages}). All notes will be preserved.`);
+        }
+      }
+
+      // Restore last page if available
+      if (data.lastPage && data.lastPage <= totalPages) {
+        if (data.lastPage === currentPage) {
+          // We're already on the target page, just reload the note content
+          loadCurrentPageNote();
+        } else {
+          await goToPage(data.lastPage);
+        }
+      } else {
+        // Just reload current page to ensure sync
         loadCurrentPageNote();
       }
 
       // Update current view
       updatePageInfo();
       updateNavigationButtons();
+
+      const noteCount = Object.keys(notes).length;
+      const pdfStatus = pdfDocument ? `(PDF: ${pdfDocument.numPages} pages)` : "(No PDF)";
+      console.log(`📂 Loaded notes file with ${noteCount} pages of notes ${pdfStatus}. Total pages now: ${totalPages}`);
 
     } catch (err) {
       alert("Error loading notes file: " + err.message);
@@ -1072,7 +1098,7 @@ closeBtn.addEventListener("click", () => {
   selectedFile = "new_notes";
   notes = {};
   currentPage = 1;
-  totalPages = 1;
+  totalPages = 100; // Reset to 100 virtual pages
   currentZoom = 1.0;
   panOffsetX = 0; // Reset pan
   panOffsetY = 0;
