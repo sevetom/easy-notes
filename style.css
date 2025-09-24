@@ -23,6 +23,19 @@ body {
   font-size: 1rem;
 }
 
+/* Info link styling */
+.info-link {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: color 0.2s ease-in-out;
+}
+
+.info-link:hover {
+  color: rgba(255, 255, 255, 1);
+  text-decoration: none;
+}
+
 .navbar .btn {
   padding: 0.25rem 0.5rem;
   font-size: 0.875rem;
