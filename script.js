@@ -667,14 +667,6 @@ async function goToPage(page, autoFocus = false) {
   // Double-check: always save current note content before switching
   saveCurrentNote();
 
-  // // Additional safety: verify the save worked correctly
-  // const savedContent = notes[previousPage] || "";
-  // const textareaContent = noteTextarea.value || "";
-  // if (savedContent !== textareaContent) {
-  //   console.warn(`⚠️  Save verification failed! Re-saving page ${previousPage}`);
-  //   notes[previousPage] = textareaContent;
-  // }
-
   currentPage = page;
 
   // Render the new page if PDF is loaded
@@ -891,7 +883,6 @@ noteTextarea.addEventListener("keydown", async (e) => {
       // Save current note before switching pages
       saveCurrentNote();
 
-      const previousPage = currentPage;
       currentPage = targetPage;
 
       // Render the new page if PDF is loaded
@@ -1014,12 +1005,6 @@ loadNotesInput.addEventListener("change", async () => {
         } else {
           totalPages = Math.max(maxNotePageNumber || 1, totalPages);
         }
-      } else {
-        // PDF is loaded: keep PDF pages but ensure we can access all note pages
-        // This allows loading notes that were taken on a different PDF or without PDF
-        if (maxNotePageNumber > totalPages) {
-          console.log(`📝 Notes contain pages beyond PDF (${maxNotePageNumber} > ${totalPages}). All notes will be preserved.`);
-        }
       }
 
       // Restore last page if available
@@ -1038,11 +1023,6 @@ loadNotesInput.addEventListener("change", async () => {
       // Update current view
       updatePageInfo();
       updateNavigationButtons();
-
-      const noteCount = Object.keys(notes).length;
-      const pdfStatus = pdfDocument ? `(PDF: ${pdfDocument.numPages} pages)` : "(No PDF)";
-      console.log(`📂 Loaded notes file with ${noteCount} pages of notes ${pdfStatus}. Total pages now: ${totalPages}`);
-
     } catch (err) {
       alert("Error loading notes file: " + err.message);
     }
@@ -1228,10 +1208,6 @@ filesInput.addEventListener("change", async function () {
           } else {
             totalPages = Math.max(maxNotePageNumber || 1, totalPages);
           }
-        } else {
-          if (maxNotePageNumber > totalPages) {
-            console.log(`📝 Notes contain pages beyond PDF (${maxNotePageNumber} > ${totalPages}). All notes will be preserved.`);
-          }
         }
         if (data.lastPage && data.lastPage <= totalPages) {
           if (data.lastPage === currentPage) {
@@ -1244,9 +1220,6 @@ filesInput.addEventListener("change", async function () {
         }
         updatePageInfo();
         updateNavigationButtons();
-        const noteCount = Object.keys(notes).length;
-        const pdfStatus = pdfDocument ? `(PDF: ${pdfDocument.numPages} pages)` : "(No PDF)";
-        console.log(`📂 Loaded notes file with ${noteCount} pages of notes ${pdfStatus}. Total pages now: ${totalPages}`);
       } catch (err) {
         alert("Error loading notes file: " + err.message);
       }
