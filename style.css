@@ -514,7 +514,6 @@ body {
 
 .notes-header {
   border-bottom: 0.125rem solid #dee2e6;
-  padding-bottom: 0.9375rem;
   margin-bottom: 1.25rem;
   flex-shrink: 0;
 }
