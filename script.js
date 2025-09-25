@@ -662,7 +662,9 @@ async function goToPage(page, autoFocus = false) {
   
   if (page < 1 || page > maxAllowedPage || page === currentPage) return;
 
-  const previousPage = currentPage;
+
+  // Clear any pending auto-save timeout to prevent spurious saves
+  clearTimeout(saveTimeout);
 
   // Double-check: always save current note content before switching
   saveCurrentNote();
@@ -835,11 +837,14 @@ noteTextarea.addEventListener("blur", () => {
 let saveTimeout;
 noteTextarea.addEventListener("input", () => {
   clearTimeout(saveTimeout);
+  const pageWhenTyping = currentPage; // Capture the page number when typing starts
   saveTimeout = setTimeout(() => {
-    if (isEditingNote) {
+    // Only auto-save if we're still editing and on the same page
+    if (isEditingNote && currentPage === pageWhenTyping) {
       saveCurrentNote();
+      showSaveConfirmation(); // Show visual feedback like Ctrl+S
     }
-  }, 1000); // Save after 1 second of no typing
+  }, 10000); // Save after 10 seconds of no typing
 });
 
 // Handle keyboard navigation while editing
@@ -880,6 +885,9 @@ noteTextarea.addEventListener("keydown", async (e) => {
     }
 
     if (targetPage !== currentPage) {
+      // Clear any pending auto-save timeout to prevent spurious saves
+      clearTimeout(saveTimeout);
+      
       // Save current note before switching pages
       saveCurrentNote();
 
