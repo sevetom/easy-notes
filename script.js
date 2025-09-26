@@ -109,6 +109,7 @@ function initializeApp() {
     <div class="shortcuts-help-content">
       ← → Navigate pages<br>
       Enter: Start editing | Esc: Exit<br>
+      Ctrl+O Open file<br>
       Ctrl++ Ctrl+- Ctrl+Wheel: Zoom controls<br>
       Click on highlighted text to remove it<br>
       <strong>While editing:</strong><br>
