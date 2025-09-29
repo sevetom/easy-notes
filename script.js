@@ -46,7 +46,6 @@ const zoomInBtn = document.getElementById("zoom-in-btn");
 const zoomOutBtn = document.getElementById("zoom-out-btn");
 const zoomInfo = document.getElementById("zoom-info");
 const highlightBtn = document.getElementById("highlight-btn");
-const eraserBtn = document.getElementById("eraser-btn");
 const savePdfBtn = document.getElementById("save-pdf-btn");
 
 // Notes elements
@@ -86,7 +85,6 @@ let panOffsetY = 0;
 
 // Highlighting state
 let isHighlightMode = false;
-let isEraserMode = false;
 let highlights = {}; // Store highlights by page
 let isSelecting = false;
 
@@ -334,7 +332,6 @@ function setupPanning() {
       e.button === 0 &&
       currentZoom > 1.0 &&
       !isHighlightMode &&
-      !isEraserMode &&
       (e.altKey || e.target === pdfCanvas) // Only pan with Alt key or when clicking on canvas (not text layer)
     ) {
       // Left mouse button and zoomed in
@@ -375,10 +372,8 @@ function setupPanning() {
 // Highlighting functions
 function toggleHighlightMode() {
   isHighlightMode = !isHighlightMode;
-  isEraserMode = false; // Disable eraser when highlighting
 
   highlightBtn.classList.toggle("active", isHighlightMode);
-  if (eraserBtn) eraserBtn.classList.remove("active");
 
   if (isHighlightMode) {
     // Disable panning when highlighting
@@ -391,22 +386,7 @@ function toggleHighlightMode() {
   }
 }
 
-function toggleEraserMode() {
-  isEraserMode = !isEraserMode;
-  isHighlightMode = false; // Disable highlighting when erasing
 
-  if (eraserBtn) eraserBtn.classList.toggle("active", isEraserMode);
-  highlightBtn.classList.remove("active");
-
-  if (isEraserMode) {
-    // Disable panning when erasing
-    pdfViewer.style.cursor = "crosshair";
-    cleanupTextSelection();
-  } else {
-    // Re-enable panning
-    pdfViewer.style.cursor = currentZoom > 1.0 ? "grab" : "default";
-  }
-}
 
 function setupTextSelection() {
   textLayer.addEventListener("mousedown", startTextSelection);
@@ -454,7 +434,7 @@ function createHighlight(range) {
   // Add click to remove functionality
   highlight.addEventListener("click", (e) => {
     e.stopPropagation();
-    if (isHighlightMode || isEraserMode) {
+    if (isHighlightMode) {
       removeHighlight(highlight);
     }
   });
@@ -499,7 +479,7 @@ function restoreHighlights() {
 
     highlight.addEventListener("click", (e) => {
       e.stopPropagation();
-      if (isHighlightMode || isEraserMode) {
+      if (isHighlightMode) {
         removeHighlight(highlight);
       }
     });
@@ -679,15 +659,13 @@ async function zoomReset() {
 function updateCanvasCursor() {
   if (isHighlightMode) {
     pdfViewer.style.cursor = "text";
-  } else if (isEraserMode) {
-    pdfViewer.style.cursor = "crosshair";
   } else {
     pdfViewer.style.cursor = "default";
   }
   
   // Set cursor on canvas specifically for panning when zoomed
   if (pdfCanvas) {
-    if (currentZoom > 1.0 && !isHighlightMode && !isEraserMode) {
+    if (currentZoom > 1.0 && !isHighlightMode) {
       pdfCanvas.style.cursor = "grab";
     } else {
       pdfCanvas.style.cursor = "inherit";
@@ -762,7 +740,6 @@ searchNextBtn.addEventListener("click", searchNext);
 searchPrevBtn.addEventListener("click", searchPrevious);
 zoomInfo.addEventListener("click", zoomReset);
 highlightBtn.addEventListener("click", toggleHighlightMode);
-if (eraserBtn) eraserBtn.addEventListener("click", toggleEraserMode);
 savePdfBtn.addEventListener("click", savePdfWithHighlights);
 
 // Mouse wheel zoom on PDF viewer
@@ -1050,7 +1027,7 @@ document.addEventListener("keydown", async (e) => {
   }
 
   // Alt key for panning mode when zoomed
-  if (e.key === "Alt" && currentZoom > 1.0 && !isHighlightMode && !isEraserMode) {
+  if (e.key === "Alt" && currentZoom > 1.0 && !isHighlightMode) {
     if (pdfViewer) {
       pdfViewer.style.cursor = "grab";
     }
@@ -1176,7 +1153,6 @@ closeBtn.addEventListener("click", () => {
   panOffsetX = 0; // Reset pan
   panOffsetY = 0;
   isHighlightMode = false;
-  isEraserMode = false;
   highlights = {};
 
   // Clear search state
@@ -1189,7 +1165,6 @@ closeBtn.addEventListener("click", () => {
 
   // Reset UI
   highlightBtn.classList.remove("active");
-  if (eraserBtn) eraserBtn.classList.remove("active");
 
   // Hide PDF and show placeholder
   pdfViewer.style.display = "none";
