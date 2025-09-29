@@ -567,7 +567,7 @@ async function savePdfWithHighlights() {
 
       const a = document.createElement("a");
       a.href = url;
-      a.download = (selectedFile || "document") + "_highlighted.pdf";
+      a.download = (selectedFile || "document");
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
