@@ -18,6 +18,7 @@ local storage or any form of auto-save.
 - 💾 Save notes to a file (.ezn format)
 - 📂 Load notes from a file
 - 📄 Write markdown formatted notes with live preview
+- 🔍 Search for keywords across notes and PDF
 - 🎨 Highlight text directly in the PDF
 - 📱 Responsive design - works on desktop, tablet, and mobile
 - ⚡ Fast loading with multiple file selection
@@ -83,6 +84,7 @@ A web page is also available at: [https://sevetom.github.io/easy-notes/](https:/
   - `Esc` Finish editing
   - `Ctrl + ←` `→` Navigate while editing
   - `Ctrl + S` Quick save
+  - `Ctrl + F` Search for a word globally
 - **No PDF needed**: You can take notes without loading a PDF - just start typing!
 
 ### 🔧 File Formats

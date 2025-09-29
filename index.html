@@ -31,6 +31,26 @@
                 </a>
             </div>
 
+            <!-- Search Bar -->
+            <div class="flex-grow-1 mx-2 mx-md-4 d-none d-sm-block">
+                <div class="search-container position-relative">
+                    <input type="text" id="search-input" class="form-control bg-dark text-light border-secondary" 
+                           placeholder="Search in PDF and notes..." style="padding-right: 70px;">
+                    <div class="search-buttons position-absolute" style="right: 5px; top: 50%; transform: translateY(-50%);">
+                        <button id="search-prev-btn" class="btn btn-sm btn-outline-light" title="Previous result" disabled>
+                            <i class="fas fa-chevron-up"></i>
+                        </button>
+                        <button id="search-next-btn" class="btn btn-sm btn-outline-light ms-1" title="Next result" disabled>
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+                    </div>
+                    <div id="search-results-info" class="search-info position-absolute text-muted small" 
+                         style="right: 80px; top: 50%; transform: translateY(-50%); display: none;">
+                        <span id="search-current">0</span>/<span id="search-total">0</span>
+                    </div>
+                </div>
+            </div>
+
             <!-- Main navigation content -->
             <div class="d-flex align-items-center gap-2 ms-auto">
                 <!-- PDF+Notes Upload -->

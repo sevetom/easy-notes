@@ -55,6 +55,14 @@ const noteTextarea = document.getElementById("note-textarea");
 const currentPageNotesSpan = document.getElementById("current-page-notes");
 const syncIcon = document.getElementById("sync-icon");
 
+// Search elements
+const searchInput = document.getElementById("search-input");
+const searchPrevBtn = document.getElementById("search-prev-btn");
+const searchNextBtn = document.getElementById("search-next-btn");
+const searchCurrentSpan = document.getElementById("search-current");
+const searchTotalSpan = document.getElementById("search-total");
+const searchResultsInfo = document.getElementById("search-results-info");
+
 // Application state
 let selectedFile = "new_notes";
 let currentPage = 1;
@@ -81,6 +89,12 @@ let isHighlightMode = false;
 let isEraserMode = false;
 let highlights = {}; // Store highlights by page
 let isSelecting = false;
+
+// Search state
+let searchResults = [];
+let currentSearchIndex = -1;
+let lastSearchTerm = "";
+let pdfTextContent = {}; // Store PDF text content by page
 
 // Initialize the application
 function initializeApp() {
@@ -109,6 +123,7 @@ function initializeApp() {
     <div class="shortcuts-help-content">
       ← → Navigate pages<br>
       Enter: Start editing | Esc: Exit<br>
+      Ctrl+F to search a word globally<br>
       Ctrl++ Ctrl+- Ctrl+Wheel: Zoom controls<br>
       Click on highlighted text to remove it<br>
       <strong>While editing:</strong><br>
@@ -207,6 +222,14 @@ async function loadPDF(file) {
     // Reset highlights for new PDF
     highlights = {};
 
+    // Clear PDF text content cache and search results
+    pdfTextContent = {};
+    clearSearch();
+    // Clear search input field
+    if (searchInput) {
+      searchInput.value = "";
+    }
+
     // Update UI
     pdfName.textContent = file.name;
     pdfPages.textContent = totalPages;
@@ -274,7 +297,16 @@ async function renderPage(pageNum) {
     updatePanTransform();
 
     // Restore highlights for this page
-    setTimeout(() => restoreHighlights(), 100);
+    setTimeout(() => {
+      restoreHighlights();
+      // Refresh search highlights if there's an active search
+      if (searchResults.length > 0 && currentSearchIndex >= 0) {
+        const currentResult = searchResults[currentSearchIndex];
+        if (currentResult && currentResult.page === pageNum) {
+          highlightSearchResult(currentResult);
+        }
+      }
+    }, 100);
 
     showSyncStatus(true);
   } catch (error) {
@@ -700,6 +732,25 @@ prevPageBtn.addEventListener("click", goToPreviousPage);
 nextPageBtn.addEventListener("click", goToNextPage);
 zoomInBtn.addEventListener("click", zoomIn);
 zoomOutBtn.addEventListener("click", zoomOut);
+
+// Event listeners for search
+searchInput.addEventListener("input", debounce(performSearch, 300));
+searchInput.addEventListener("keydown", function(e) {
+  if (e.key === "Enter") {
+    e.preventDefault();
+    if (e.shiftKey) {
+      searchPrevious();
+    } else {
+      searchNext();
+    }
+  } else if (e.key === "Escape") {
+    clearSearch();
+    searchInput.blur();
+  }
+});
+
+searchNextBtn.addEventListener("click", searchNext);
+searchPrevBtn.addEventListener("click", searchPrevious);
 zoomInfo.addEventListener("click", zoomReset);
 highlightBtn.addEventListener("click", toggleHighlightMode);
 if (eraserBtn) eraserBtn.addEventListener("click", toggleEraserMode);
@@ -922,6 +973,16 @@ document.addEventListener("keydown", async (e) => {
     return;
   }
 
+  // Focus search bar with Ctrl+F
+  if (e.ctrlKey && e.key.toLowerCase() === "f") {
+    e.preventDefault();
+    if (searchInput) {
+      searchInput.focus();
+      searchInput.select(); // Select all text if any
+    }
+    return;
+  }
+
   // Only handle shortcuts if not editing a note and not in an input field
   if (!isEditingNote && !e.target.matches("input, textarea")) {
     switch (e.key) {
@@ -1095,6 +1156,14 @@ closeBtn.addEventListener("click", () => {
   isEraserMode = false;
   highlights = {};
 
+  // Clear search state
+  pdfTextContent = {};
+  clearSearch();
+  // Clear search input field
+  if (searchInput) {
+    searchInput.value = "";
+  }
+
   // Reset UI
   highlightBtn.classList.remove("active");
   if (eraserBtn) eraserBtn.classList.remove("active");
@@ -1238,3 +1307,293 @@ filesInput.addEventListener("change", async function () {
     filesInput.value = '';
   }
 });
+
+// ==================== SEARCH FUNCTIONALITY ====================
+
+// Debounce function to avoid excessive search calls
+function debounce(func, wait) {
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
+}
+
+// Extract text content from PDF page
+async function extractTextFromPage(pageNum) {
+  if (!pdfDocument || pdfTextContent[pageNum]) {
+    return pdfTextContent[pageNum] || "";
+  }
+
+  try {
+    const page = await pdfDocument.getPage(pageNum);
+    const textContent = await page.getTextContent();
+    const text = textContent.items.map(item => item.str).join(" ");
+    pdfTextContent[pageNum] = text;
+    return text;
+  } catch (error) {
+    console.error(`Error extracting text from page ${pageNum}:`, error);
+    return "";
+  }
+}
+
+// Perform search across PDF and notes
+async function performSearch() {
+  const searchTerm = searchInput.value.trim();
+  
+  if (searchTerm.length < 2) {
+    clearSearch();
+    return;
+  }
+
+  // If search term hasn't changed, don't search again
+  if (searchTerm === lastSearchTerm) {
+    return;
+  }
+
+  lastSearchTerm = searchTerm;
+  searchResults = [];
+  currentSearchIndex = -1;
+
+  const searchRegex = new RegExp(escapeRegExp(searchTerm), 'gi');
+
+  try {
+    // Search in PDF content
+    if (pdfDocument) {
+      for (let pageNum = 1; pageNum <= pdfDocument.numPages; pageNum++) {
+        const text = await extractTextFromPage(pageNum);
+        const matches = [...text.matchAll(searchRegex)];
+        
+        matches.forEach(match => {
+          searchResults.push({
+            type: 'pdf',
+            page: pageNum,
+            text: text,
+            match: match[0],
+            index: match.index
+          });
+        });
+      }
+    }
+
+    // Search in notes
+    Object.keys(notes).forEach(pageNum => {
+      const noteText = notes[pageNum] || "";
+      const matches = [...noteText.matchAll(searchRegex)];
+      
+      matches.forEach(match => {
+        searchResults.push({
+          type: 'note',
+          page: parseInt(pageNum),
+          text: noteText,
+          match: match[0],
+          index: match.index
+        });
+      });
+    });
+
+    // Sort results by page number
+    searchResults.sort((a, b) => a.page - b.page);
+
+    updateSearchUI();
+    
+    // If there are results, go to the first one
+    if (searchResults.length > 0) {
+      currentSearchIndex = 0;
+      await goToSearchResult(0);
+    }
+
+  } catch (error) {
+    console.error("Error performing search:", error);
+  }
+}
+
+// Navigate to specific search result
+async function goToSearchResult(index) {
+  if (index < 0 || index >= searchResults.length) {
+    return;
+  }
+
+  currentSearchIndex = index;
+  const result = searchResults[index];
+  
+  // Navigate to the page if needed
+  if (currentPage !== result.page) {
+    await goToPage(result.page);
+  }
+
+  // Highlight the result
+  highlightSearchResult(result);
+  updateSearchUI();
+}
+
+// Highlight search result in current view
+function highlightSearchResult(result) {
+  // Clear previous highlights
+  clearSearchHighlights();
+
+  if (result.type === 'note') {
+    // Highlight in note textarea
+    highlightInTextarea(result);
+  } else if (result.type === 'pdf') {
+    // Highlight in PDF text layer
+    highlightInPdfTextLayer(result);
+  }
+}
+
+// Highlight text in textarea (notes)
+function highlightInTextarea(result) {
+  if (!noteTextarea || !result.text) return;
+
+  const textarea = noteTextarea;
+  const start = result.index;
+  const end = start + result.match.length;
+  
+  // Focus and select the text
+  textarea.focus();
+  textarea.setSelectionRange(start, end);
+  textarea.scrollTop = Math.max(0, (start / result.text.length) * textarea.scrollHeight - textarea.clientHeight / 2);
+}
+
+// Highlight text in PDF text layer
+function highlightInPdfTextLayer(result) {
+  const textLayer = document.getElementById("text-layer");
+  if (!textLayer) return;
+
+  // Find text nodes and highlight matching text
+  const walker = document.createTreeWalker(
+    textLayer,
+    NodeFilter.SHOW_TEXT,
+    null,
+    false
+  );
+
+  let node;
+  let fullText = "";
+  const textNodes = [];
+
+  // Collect all text nodes and build full text
+  while (node = walker.nextNode()) {
+    textNodes.push({
+      node: node,
+      startIndex: fullText.length,
+      endIndex: fullText.length + node.textContent.length
+    });
+    fullText += node.textContent;
+  }
+
+  // Find the matching text position in the accumulated text
+  const searchRegex = new RegExp(escapeRegExp(result.match), 'gi');
+  const matches = [...fullText.matchAll(searchRegex)];
+  
+  if (matches.length > 0) {
+    const match = matches[0]; // Take first match for simplicity
+    const matchStart = match.index;
+    const matchEnd = matchStart + match[0].length;
+
+    // Find which text nodes contain the match
+    textNodes.forEach(({node, startIndex, endIndex}) => {
+      if (startIndex < matchEnd && endIndex > matchStart) {
+        // This node contains part of the match
+        const nodeMatchStart = Math.max(0, matchStart - startIndex);
+        const nodeMatchEnd = Math.min(node.textContent.length, matchEnd - startIndex);
+        
+        if (nodeMatchStart < nodeMatchEnd) {
+          highlightTextNode(node, nodeMatchStart, nodeMatchEnd);
+        }
+      }
+    });
+  }
+}
+
+// Highlight portion of a text node
+function highlightTextNode(textNode, start, end) {
+  const parent = textNode.parentNode;
+  const text = textNode.textContent;
+  
+  // Split the text node
+  const beforeText = text.substring(0, start);
+  const matchText = text.substring(start, end);
+  const afterText = text.substring(end);
+  
+  // Create new nodes
+  const beforeNode = document.createTextNode(beforeText);
+  const highlightNode = document.createElement("span");
+  highlightNode.className = "search-highlight current";
+  highlightNode.textContent = matchText;
+  const afterNode = document.createTextNode(afterText);
+  
+  // Replace original text node
+  parent.insertBefore(beforeNode, textNode);
+  parent.insertBefore(highlightNode, textNode);
+  parent.insertBefore(afterNode, textNode);
+  parent.removeChild(textNode);
+  
+  // Scroll highlight into view
+  setTimeout(() => {
+    highlightNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 100);
+}
+
+// Clear search highlights
+function clearSearchHighlights() {
+  // Clear PDF highlights
+  const highlights = document.querySelectorAll(".search-highlight");
+  highlights.forEach(highlight => {
+    const parent = highlight.parentNode;
+    parent.insertBefore(document.createTextNode(highlight.textContent), highlight);
+    parent.removeChild(highlight);
+    parent.normalize(); // Merge adjacent text nodes
+  });
+}
+
+// Navigate to next search result
+function searchNext() {
+  if (searchResults.length === 0) return;
+  
+  const nextIndex = (currentSearchIndex + 1) % searchResults.length;
+  goToSearchResult(nextIndex);
+}
+
+// Navigate to previous search result
+function searchPrevious() {
+  if (searchResults.length === 0) return;
+  
+  const prevIndex = currentSearchIndex === 0 ? searchResults.length - 1 : currentSearchIndex - 1;
+  goToSearchResult(prevIndex);
+}
+
+// Clear search and results
+function clearSearch() {
+  searchResults = [];
+  currentSearchIndex = -1;
+  lastSearchTerm = "";
+  clearSearchHighlights();
+  updateSearchUI();
+}
+
+// Update search UI elements
+function updateSearchUI() {
+  const hasResults = searchResults.length > 0;
+  const currentResult = currentSearchIndex + 1;
+  
+  searchPrevBtn.disabled = !hasResults;
+  searchNextBtn.disabled = !hasResults;
+  
+  if (hasResults) {
+    searchCurrentSpan.textContent = currentResult;
+    searchTotalSpan.textContent = searchResults.length;
+    searchResultsInfo.style.display = "block";
+  } else {
+    searchResultsInfo.style.display = "none";
+  }
+}
+
+// Escape special regex characters
+function escapeRegExp(string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
