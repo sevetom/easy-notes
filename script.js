@@ -123,8 +123,9 @@ function initializeApp() {
     <div class="shortcuts-help-content">
       ← → Navigate pages<br>
       Enter: Start editing | Esc: Exit<br>
-      Ctrl+F to search a word globally<br>
+      Ctrl+F: Search for a keyword<br>
       Ctrl++ Ctrl+- Ctrl+Wheel: Zoom controls<br>
+      Alt+Drag: Pan while zoomed<br>
       Click on highlighted text to remove it<br>
       <strong>While editing:</strong><br>
       Ctrl+← → Navigate while typing<br>
@@ -333,7 +334,8 @@ function setupPanning() {
       e.button === 0 &&
       currentZoom > 1.0 &&
       !isHighlightMode &&
-      !isEraserMode
+      !isEraserMode &&
+      (e.altKey || e.target === pdfCanvas) // Only pan with Alt key or when clicking on canvas (not text layer)
     ) {
       // Left mouse button and zoomed in
       isPanning = true;
@@ -679,10 +681,17 @@ function updateCanvasCursor() {
     pdfViewer.style.cursor = "text";
   } else if (isEraserMode) {
     pdfViewer.style.cursor = "crosshair";
-  } else if (currentZoom > 1.0) {
-    pdfViewer.style.cursor = "grab";
   } else {
     pdfViewer.style.cursor = "default";
+  }
+  
+  // Set cursor on canvas specifically for panning when zoomed
+  if (pdfCanvas) {
+    if (currentZoom > 1.0 && !isHighlightMode && !isEraserMode) {
+      pdfCanvas.style.cursor = "grab";
+    } else {
+      pdfCanvas.style.cursor = "inherit";
+    }
   }
 }
 
@@ -1038,6 +1047,20 @@ document.addEventListener("keydown", async (e) => {
     saveCurrentNote();
     showSaveConfirmation();
     return;
+  }
+
+  // Alt key for panning mode when zoomed
+  if (e.key === "Alt" && currentZoom > 1.0 && !isHighlightMode && !isEraserMode) {
+    if (pdfViewer) {
+      pdfViewer.style.cursor = "grab";
+    }
+  }
+});
+
+// Handle Alt key release
+document.addEventListener("keyup", (e) => {
+  if (e.key === "Alt") {
+    updateCanvasCursor();
   }
 });
 
