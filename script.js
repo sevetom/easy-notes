@@ -419,74 +419,115 @@ function endTextSelection(e) {
 function createHighlight(range) {
   const pageHighlights = highlights[currentPage] || [];
 
-  // Create highlight element
-  const highlight = document.createElement("div");
-  highlight.className = "user-highlight";
-  highlight.style.position = "absolute";
-
-  const rect = range.getBoundingClientRect();
+  // Get all rectangles for the selection (handles multi-line selections properly)
+  const clientRects = range.getClientRects();
   const textLayerRect = textLayer.getBoundingClientRect();
+  
+  if (clientRects.length === 0) return;
 
-  highlight.style.left = rect.left - textLayerRect.left + "px";
-  highlight.style.top = rect.top - textLayerRect.top + "px";
-  highlight.style.width = rect.width + "px";
-  highlight.style.height = rect.height + "px";
+  const highlightElements = [];
+  const rects = [];
 
-  // Add click to remove functionality
-  highlight.addEventListener("click", (e) => {
-    e.stopPropagation();
-    if (isHighlightMode) {
-      removeHighlight(highlight);
-    }
-  });
+  // Create a highlight element for each rectangle (line)
+  for (let i = 0; i < clientRects.length; i++) {
+    const rect = clientRects[i];
+    
+    // Skip very small rectangles (likely empty spaces)
+    if (rect.width < 1 || rect.height < 1) continue;
 
-  textLayer.appendChild(highlight);
+    const highlight = document.createElement("div");
+    highlight.className = "user-highlight";
+    highlight.style.position = "absolute";
 
-  // Store highlight data
-  const highlightData = {
-    element: highlight,
-    text: range.toString(),
-    rect: {
-      left: rect.left - textLayerRect.left,
-      top: rect.top - textLayerRect.top,
+    const relativeLeft = rect.left - textLayerRect.left;
+    const relativeTop = rect.top - textLayerRect.top;
+
+    highlight.style.left = relativeLeft + "px";
+    highlight.style.top = relativeTop + "px";
+    highlight.style.width = rect.width + "px";
+    highlight.style.height = rect.height + "px";
+
+    // Add click to remove functionality
+    highlight.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (isHighlightMode) {
+        removeHighlight(highlightData);
+      }
+    });
+
+    textLayer.appendChild(highlight);
+    highlightElements.push(highlight);
+    
+    // Store rectangle data
+    rects.push({
+      left: relativeLeft,
+      top: relativeTop,
       width: rect.width,
       height: rect.height,
-    },
+    });
+  }
+
+  // Store highlight data with multiple elements and rectangles
+  const highlightData = {
+    elements: highlightElements,
+    text: range.toString(),
+    rects: rects,
   };
 
   pageHighlights.push(highlightData);
   highlights[currentPage] = pageHighlights;
 }
 
-function removeHighlight(highlightElement) {
+function removeHighlight(highlightData) {
   const pageHighlights = highlights[currentPage] || [];
-  const index = pageHighlights.findIndex((h) => h.element === highlightElement);
+  const index = pageHighlights.findIndex((h) => h === highlightData);
   if (index > -1) {
     pageHighlights.splice(index, 1);
-    highlightElement.remove();
+    
+    // Remove all elements for this highlight (handles both single and multi-line highlights)
+    if (highlightData.elements) {
+      // New format with multiple elements
+      highlightData.elements.forEach(element => element.remove());
+    } else if (highlightData.element) {
+      // Old format with single element (for backward compatibility)
+      highlightData.element.remove();
+    }
   }
 }
 
 function restoreHighlights() {
   const pageHighlights = highlights[currentPage] || [];
   pageHighlights.forEach((highlightData) => {
-    const highlight = document.createElement("div");
-    highlight.className = "user-highlight";
-    highlight.style.position = "absolute";
-    highlight.style.left = highlightData.rect.left + "px";
-    highlight.style.top = highlightData.rect.top + "px";
-    highlight.style.width = highlightData.rect.width + "px";
-    highlight.style.height = highlightData.rect.height + "px";
+    // Handle both new format (multiple rects) and old format (single rect)
+    const rects = highlightData.rects || [highlightData.rect];
+    const elements = [];
 
-    highlight.addEventListener("click", (e) => {
-      e.stopPropagation();
-      if (isHighlightMode) {
-        removeHighlight(highlight);
-      }
+    rects.forEach((rect) => {
+      const highlight = document.createElement("div");
+      highlight.className = "user-highlight";
+      highlight.style.position = "absolute";
+      highlight.style.left = rect.left + "px";
+      highlight.style.top = rect.top + "px";
+      highlight.style.width = rect.width + "px";
+      highlight.style.height = rect.height + "px";
+
+      highlight.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (isHighlightMode) {
+          removeHighlight(highlightData);
+        }
+      });
+
+      textLayer.appendChild(highlight);
+      elements.push(highlight);
     });
 
-    textLayer.appendChild(highlight);
-    highlightData.element = highlight;
+    // Update highlightData to use new format
+    highlightData.elements = elements;
+    // Keep old format for backward compatibility
+    if (!highlightData.rects && highlightData.rect) {
+      highlightData.element = elements[0];
+    }
   });
 }
 
