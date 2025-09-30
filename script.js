@@ -851,8 +851,13 @@ async function goToPage(page, autoFocus = false) {
   // but respect totalPages when there's a PDF loaded
   const maxAllowedPage = pdfDocument ? totalPages : Math.max(totalPages, 1000); // Allow up to 1000 pages without PDF
   
-  if (page < 1 || page > maxAllowedPage || page === currentPage) return;
+  if (page < 1 || page > maxAllowedPage) return;
 
+  // If we're already on the target page, just reload the note content
+  if (page === currentPage) {
+    loadCurrentPageNote(autoFocus);
+    return;
+  }
 
   // Clear any pending auto-save timeout to prevent spurious saves
   clearTimeout(saveTimeout);
@@ -972,6 +977,12 @@ function clearAllNotes() {
 }
 
 function saveCurrentNote() {
+  // Only save if we're actually editing or if there's content to save
+  if (!isEditingNote && noteTextarea.value.trim() === "") {
+    // If we're not editing and textarea is empty, don't overwrite existing notes
+    return;
+  }
+
   // Always save the current content of the textarea
   const currentContent = noteTextarea.value || "";
   const previousContent = notes[currentPage] || "";
@@ -1232,8 +1243,14 @@ loadNotesInput.addEventListener("change", async () => {
         throw new Error("Invalid notes file format. Expected format: { notes: {...}, totalPages: ..., lastPage: ... }");
       }
 
-      // Deep copy to avoid reference issues
-      notes = JSON.parse(JSON.stringify(data.notes));
+      // Deep copy to avoid reference issues and convert string keys to numbers
+      notes = {};
+      Object.keys(data.notes).forEach(key => {
+        const pageNum = parseInt(key);
+        if (!isNaN(pageNum) && pageNum > 0) {
+          notes[pageNum] = data.notes[key];
+        }
+      });
 
       // Calculate the maximum page number from loaded notes
       const notePageNumbers = Object.keys(notes).map(Number).filter(n => !isNaN(n) && n > 0);
@@ -1251,12 +1268,7 @@ loadNotesInput.addEventListener("change", async () => {
 
       // Restore last page if available
       if (data.lastPage && data.lastPage <= totalPages) {
-        if (data.lastPage === currentPage) {
-          // We're already on the target page, just reload the note content
-          loadCurrentPageNote();
-        } else {
-          await goToPage(data.lastPage);
-        }
+        await goToPage(data.lastPage);
       } else {
         // Just reload current page to ensure sync
         loadCurrentPageNote();
