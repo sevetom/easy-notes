@@ -45,6 +45,7 @@ const totalPagesSpan = document.getElementById("total-pages");
 const zoomInBtn = document.getElementById("zoom-in-btn");
 const zoomOutBtn = document.getElementById("zoom-out-btn");
 const zoomInfo = document.getElementById("zoom-info");
+const fitToWidthBtn = document.getElementById("fit-to-width-btn");
 const highlightBtn = document.getElementById("highlight-btn");
 const savePdfBtn = document.getElementById("save-pdf-btn");
 
@@ -655,6 +656,44 @@ async function zoomReset() {
   await zoomTo(1.0);
 }
 
+async function fitToWidth() {
+  if (!pdfDocument) return;
+
+  try {
+    // Get current page to calculate viewport dimensions
+    const page = await pdfDocument.getPage(currentPage);
+    const baseViewport = page.getViewport({ scale: 1.0 });
+    
+    // Get the pdf-viewer container dimensions (this is the actual visible area)
+    const pdfViewer = document.getElementById("pdf-viewer");
+    const viewerWidth = pdfViewer.clientWidth;
+    
+    // Get any scrollbar width that might reduce available space
+    const scrollbarWidth = pdfViewer.offsetWidth - pdfViewer.clientWidth;
+    
+    // Calculate the maximum width we can use, accounting for:
+    // - The canvas border (1px each side = 2px total)
+    // - Minimal padding to avoid edge clipping (2px total)
+    const borderWidth = 2;
+    const padding = 2;
+    const availableWidth = viewerWidth - borderWidth - padding;
+    
+    // Calculate the optimal zoom to fit the PDF width to available width
+    const optimalZoom = availableWidth / baseViewport.width;
+    
+    // Clamp the zoom within allowed limits
+    const clampedZoom = Math.max(minZoom, Math.min(maxZoom, optimalZoom));
+    
+    // Reset pan offset when fitting to width
+    panOffsetX = 0;
+    panOffsetY = 0;
+    
+    await zoomTo(clampedZoom);
+  } catch (error) {
+    console.error("Error fitting to width:", error);
+  }
+}
+
 // Update cursor based on zoom level
 function updateCanvasCursor() {
   if (isHighlightMode) {
@@ -719,6 +758,7 @@ prevPageBtn.addEventListener("click", goToPreviousPage);
 nextPageBtn.addEventListener("click", goToNextPage);
 zoomInBtn.addEventListener("click", zoomIn);
 zoomOutBtn.addEventListener("click", zoomOut);
+fitToWidthBtn.addEventListener("click", fitToWidth);
 
 // Event listeners for search
 searchInput.addEventListener("input", debounce(performSearch, 300));
