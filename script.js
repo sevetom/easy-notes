@@ -472,6 +472,7 @@ function createHighlight(range) {
     elements: highlightElements,
     text: range.toString(),
     rects: rects,
+    scale: currentZoom, // Save the zoom level when highlight was created
   };
 
   pageHighlights.push(highlightData);
@@ -531,6 +532,83 @@ function restoreHighlights() {
   });
 }
 
+// Helper function to merge overlapping rectangles to avoid double-opacity in PDF
+function mergeOverlappingRects(rects, scale) {
+  if (!rects || rects.length === 0) return [];
+  
+  // Convert to PDF coordinates and normalize
+  const normalizedRects = rects.map(rect => ({
+    x: rect.left / scale,
+    y: rect.top / scale,
+    width: rect.width / scale,
+    height: rect.height / scale,
+    right: (rect.left + rect.width) / scale,
+    bottom: (rect.top + rect.height) / scale
+  }));
+  
+  // Sort by y position (top to bottom), then by x position (left to right)
+  normalizedRects.sort((a, b) => a.y - b.y || a.x - b.x);
+  
+  const mergedRects = [];
+  let currentGroup = [normalizedRects[0]];
+  
+  for (let i = 1; i < normalizedRects.length; i++) {
+    const current = normalizedRects[i];
+    const lastInGroup = currentGroup[currentGroup.length - 1];
+    
+    // Check if rectangles are on the same line (similar y position and height)
+    const sameLineThreshold = Math.min(lastInGroup.height, current.height) * 0.5;
+    const onSameLine = Math.abs(current.y - lastInGroup.y) < sameLineThreshold &&
+                       Math.abs(current.height - lastInGroup.height) < sameLineThreshold;
+    
+    if (onSameLine) {
+      // Add to current group if on same line
+      currentGroup.push(current);
+    } else {
+      // Process current group and start new one
+      mergedRects.push(mergeGroup(currentGroup));
+      currentGroup = [current];
+    }
+  }
+  
+  // Process the last group
+  if (currentGroup.length > 0) {
+    mergedRects.push(mergeGroup(currentGroup));
+  }
+  
+  return mergedRects.flat();
+}
+
+// Helper function to merge rectangles in the same group (same line)
+function mergeGroup(group) {
+  if (group.length === 1) return group;
+  
+  // Sort by x position
+  group.sort((a, b) => a.x - b.x);
+  
+  const merged = [];
+  let current = { ...group[0] };
+  
+  for (let i = 1; i < group.length; i++) {
+    const next = group[i];
+    
+    // Check if rectangles overlap or are adjacent
+    if (next.x <= current.right + 2) { // Small gap tolerance
+      // Merge rectangles
+      current.width = Math.max(current.right, next.right) - current.x;
+      current.right = current.x + current.width;
+      current.height = Math.max(current.height, next.height);
+    } else {
+      // No overlap, save current and start new
+      merged.push(current);
+      current = { ...next };
+    }
+  }
+  
+  merged.push(current);
+  return merged;
+}
+
 async function savePdfWithHighlights() {
   // Use ArrayBuffer as backup if Uint8Array is empty
   let pdfData = originalPdfBytes;
@@ -560,26 +638,40 @@ async function savePdfWithHighlights() {
         if (pageIndex >= 0 && pageIndex < pages.length) {
           const page = pages[pageIndex];
           const { width, height } = page.getSize();
+          
+          // Get the original page from the PDF document
+          const originalPage = await pdfDocument.getPage(pageIndex + 1);
+          const originalViewport = originalPage.getViewport({ scale: 1.0 });
 
           // Add highlight annotations for each highlight on this page
           for (const highlight of pageHighlights) {
-            // Get the rectangle coordinates (already relative to text layer)
-            const rect = highlight.rect;
+            // Handle both new format (multiple rects) and old format (single rect)
+            const rects = highlight.rects || [highlight.rect];
+            // Get the scale that was used when this highlight was created
+            const highlightScale = highlight.scale || 1.0;
 
-            // Convert from text layer coordinates to PDF coordinates
-            // PDF coordinates are from bottom-left, our coordinates are from top-left
-            const pdfX = rect.left;
-            const pdfY = height - rect.top - rect.height;
+            // For multi-line highlights, merge overlapping rectangles to avoid double-opacity
+            const mergedRects = mergeOverlappingRects(rects, highlightScale);
+            
+            // Create a rectangle for each merged part of the highlight
+            for (const rect of mergedRects) {
+              if (!rect) continue; // Skip if rect is undefined
 
-            // Create a highlight annotation
-            page.drawRectangle({
-              x: pdfX,
-              y: pdfY,
-              width: rect.width,
-              height: rect.height,
-              color: PDFLib.rgb(1, 1, 0), // Yellow color
-              opacity: 0.4,
-            });
+              // Convert from text layer coordinates to PDF coordinates
+              // PDF coordinates are from bottom-left, our coordinates are from top-left
+              const pdfX = rect.x;
+              const pdfY = originalViewport.height - rect.y - rect.height;
+
+              // Create a highlight annotation
+              page.drawRectangle({
+                x: pdfX,
+                y: pdfY,
+                width: rect.width,
+                height: rect.height,
+                color: PDFLib.rgb(1, 1, 0), // Yellow color
+                opacity: 0.4,
+              });
+            }
           }
         }
       }
