@@ -806,10 +806,8 @@ async function fitToWidth() {
     
     // Calculate the maximum width we can use, accounting for:
     // - The canvas border (1px each side = 2px total)
-    // - Minimal padding to avoid edge clipping (2px total)
     const borderWidth = 2;
-    const padding = 2;
-    const availableWidth = viewerWidth - borderWidth - padding;
+    const availableWidth = viewerWidth - borderWidth;
     
     // Calculate the optimal zoom to fit the PDF width to available width
     const optimalZoom = availableWidth / baseViewport.width;
