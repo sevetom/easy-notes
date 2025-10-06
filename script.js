@@ -1782,7 +1782,7 @@ function escapeRegExp(string) {
 // Add navigation confirmation for any URL change
 window.addEventListener('beforeunload', function(event) {
   // Show confirmation dialog when user tries to leave the page
-  const confirmationMessage = 'Stai per lasciare la pagina. Eventuali modifiche non salvate potrebbero andare perse. Sei sicuro di voler continuare?';
+  const confirmationMessage = 'You are about to leave the page. Make sure to save your notes before leaving.';
   
   // Standard way to show confirmation dialog
   event.preventDefault();
