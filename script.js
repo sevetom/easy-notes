@@ -1778,3 +1778,14 @@ function updateSearchUI() {
 function escapeRegExp(string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
+
+// Add navigation confirmation for any URL change
+window.addEventListener('beforeunload', function(event) {
+  // Show confirmation dialog when user tries to leave the page
+  const confirmationMessage = 'Stai per lasciare la pagina. Eventuali modifiche non salvate potrebbero andare perse. Sei sicuro di voler continuare?';
+  
+  // Standard way to show confirmation dialog
+  event.preventDefault();
+  event.returnValue = confirmationMessage;
+  return confirmationMessage;
+});
