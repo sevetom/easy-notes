@@ -285,27 +285,10 @@ function showSaveConfirmation() {
 pdfInput.addEventListener("change", async function () {
   const file = pdfInput.files[0];
 
-  // Check if there are unsaved notes before opening a new PDF
-  if (
-    file &&
-    file.type === "application/pdf" &&
-    Object.keys(notes).length > 0
-  ) {
-    const confirmOpen = confirm(
-      "You have unsaved notes. Opening a new PDF will clear all current notes. Are you sure you want to continue?"
-    );
-    if (!confirmOpen) {
-      // Reset the file input if user cancels
-      pdfInput.value = "";
-      return;
-    }
-  }
-
   selectedFile = file ? file.name.replace(/\.pdf$/i, "") : "new_notes";
 
   if (file && file.type === "application/pdf") {
-    // Clear all existing notes when opening a new PDF
-    clearAllNotes();
+    // Load PDF without clearing notes - keeps notes from previous sessions
     await loadPDF(file);
   }
 });
@@ -1573,9 +1556,15 @@ filesInput.addEventListener("change", async function () {
   if (pdfFile) {
     // Set the selected file name for saving notes
     selectedFile = pdfFile.name.replace(/\.pdf$/i, "");
-    // Clear all existing notes when opening a new PDF
-    clearAllNotes();
-    await loadPDF(pdfFile);
+    // Load PDF without clearing notes - only clear if notes file is also provided
+    if (!eznFile) {
+      // If no notes file is provided, keep existing notes
+      await loadPDF(pdfFile);
+    } else {
+      // If notes file is provided, clear notes first (will be loaded from file)
+      clearAllNotes();
+      await loadPDF(pdfFile);
+    }
   }
 
   // Load notes if present
