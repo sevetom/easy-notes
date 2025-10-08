@@ -86,6 +86,12 @@
                     <i class="fas fa-times me-1"></i>
                     <span class="d-none d-lg-inline">Close</span>
                 </button>
+
+                <!-- Shortcuts Help Button -->
+                <button id="shortcuts-btn" class="btn btn-outline-light btn-sm d-flex align-items-center" 
+                        title="Keyboard shortcuts">
+                    <i class="fas fa-keyboard"></i>
+                </button>
             </div>
         </div>
     </nav>
@@ -160,6 +166,60 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shortcuts Modal -->
+    <div id="shortcutsModal" class="shortcuts-modal">
+        <div class="shortcuts-modal-overlay"></div>
+        <div class="shortcuts-modal-content">
+            <div class="shortcuts-modal-header">
+                <h5><i class="fas fa-keyboard me-2"></i>Keyboard Shortcuts</h5>
+                <button type="button" class="shortcuts-close-btn" aria-label="Close">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+                        <div class="shortcuts-modal-body">
+                <div class="shortcut-item">
+                    <span class="shortcut-description">Navigate pages</span>
+                    <kbd>← →</kbd>
+                </div>
+                <div class="shortcut-item">
+                    <span class="shortcut-description">Start editing</span>
+                    <kbd>Enter</kbd>
+                </div>
+                <div class="shortcut-item">
+                    <span class="shortcut-description">Exit editing</span>
+                    <kbd>Esc</kbd>
+                </div>
+                <div class="shortcut-item">
+                    <span class="shortcut-description">Search for a keyword</span>
+                    <kbd>Ctrl + F</kbd>
+                </div>
+                <div class="shortcut-item">
+                    <span class="shortcut-description">Zoom controls</span>
+                    <kbd>Ctrl + + / - / Wheel</kbd>
+                </div>
+                <div class="shortcut-item">
+                    <span class="shortcut-description">Pan while zoomed</span>
+                    <kbd>Alt + Drag</kbd>
+                </div>
+                <div class="shortcut-item">
+                    <span class="shortcut-description">Remove highlight</span>
+                    <kbd>Click on highlighted text</kbd>
+                </div>
+                <div class="shortcut-section-title">
+                    <strong>While editing:</strong>
+                </div>
+                <div class="shortcut-item">
+                    <span class="shortcut-description">Navigate while typing</span>
+                    <kbd>Ctrl + ← →</kbd>
+                </div>
+                <div class="shortcut-item">
+                    <span class="shortcut-description">Save notes</span>
+                    <kbd>Ctrl + S</kbd>
                 </div>
             </div>
         </div>

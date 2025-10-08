@@ -190,46 +190,42 @@ function initializeApp() {
   // Show placeholder initially
   pdfPlaceholder.style.display = "flex";
   pdfViewer.style.display = "none";
+  
+  // Setup shortcuts modal
+  setupShortcutsModal();
+}
 
-  // Add keyboard shortcuts help
-  const shortcutsDiv = document.createElement("div");
-  shortcutsDiv.className = "shortcuts-help collapsed"; // Start collapsed
-  shortcutsDiv.innerHTML = `
-    <div class="shortcuts-help-header">
-      <strong>Keyboard Shortcuts</strong>
-      <button class="shortcuts-toggle" title="Show shortcuts">
-        <i class="fas fa-chevron-up"></i>
-      </button>
-    </div>
-    <div class="shortcuts-help-content">
-      ← → Navigate pages<br>
-      Enter: Start editing | Esc: Exit<br>
-      Ctrl+F: Search for a keyword<br>
-      Ctrl++ Ctrl+- Ctrl+Wheel: Zoom controls<br>
-      Alt+Drag: Pan while zoomed<br>
-      Click on highlighted text to remove it<br>
-      <strong>While editing:</strong><br>
-      Ctrl+← → Navigate while typing<br>
-      Ctrl+S: Save notes
-    </div>
-  `;
-  document.body.appendChild(shortcutsDiv);
-
-  // Add toggle functionality for shortcuts help
-  const toggleBtn = shortcutsDiv.querySelector(".shortcuts-toggle");
-  toggleBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    shortcutsDiv.classList.toggle("collapsed");
-    const isCollapsed = shortcutsDiv.classList.contains("collapsed");
-    const icon = toggleBtn.querySelector("i");
-    icon.className = isCollapsed ? "fas fa-chevron-up" : "fas fa-chevron-down";
-    toggleBtn.title = isCollapsed ? "Show shortcuts" : "Hide shortcuts";
-  });
-
-  // Also allow clicking on header to toggle
-  const header = shortcutsDiv.querySelector(".shortcuts-help-header");
-  header.addEventListener("click", () => {
-    toggleBtn.click();
+// Setup shortcuts modal functionality
+function setupShortcutsModal() {
+  const shortcutsBtn = document.getElementById('shortcuts-btn');
+  const modal = document.getElementById('shortcutsModal');
+  const closeBtn = modal.querySelector('.shortcuts-close-btn');
+  const overlay = modal.querySelector('.shortcuts-modal-overlay');
+  
+  function openModal() {
+    modal.classList.add('show');
+    document.body.style.overflow = 'hidden'; // Prevent background scrolling
+  }
+  
+  function closeModal() {
+    modal.classList.remove('show');
+    document.body.style.overflow = ''; // Restore scrolling
+  }
+  
+  // Open modal on button click
+  shortcutsBtn.addEventListener('click', openModal);
+  
+  // Close modal on close button click
+  closeBtn.addEventListener('click', closeModal);
+  
+  // Close modal on overlay click
+  overlay.addEventListener('click', closeModal);
+  
+  // Close modal on Escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal.classList.contains('show')) {
+      closeModal();
+    }
   });
 }
 
