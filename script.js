@@ -1068,6 +1068,24 @@ noteTextarea.addEventListener("input", () => {
 
 // Handle keyboard navigation while editing
 noteTextarea.addEventListener("keydown", async (e) => {
+  // Insert 4 spaces when Tab is pressed
+  if (e.key === "Tab") {
+    e.preventDefault();
+    const start = noteTextarea.selectionStart;
+    const end = noteTextarea.selectionEnd;
+    const value = noteTextarea.value;
+    
+    // Insert 4 spaces at cursor position
+    noteTextarea.value = value.substring(0, start) + "\t" + value.substring(end);
+    
+    // Move cursor after the inserted spaces
+    noteTextarea.selectionStart = noteTextarea.selectionEnd = start + 4;
+    
+    // Trigger input event to update preview
+    noteTextarea.dispatchEvent(new Event("input"));
+    return;
+  }
+
   // Save with Ctrl+S
   if (e.ctrlKey && e.key === "s") {
     e.preventDefault();
