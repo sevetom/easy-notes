@@ -95,8 +95,63 @@ let currentSearchIndex = -1;
 let lastSearchTerm = "";
 let pdfTextContent = {}; // Store PDF text content by page
 
+// LocalStorage management for auto-backup
+const LOCALSTORAGE_KEY = 'easyNotes_recentNotes';
+
+function saveNotesToLocalStorage() {
+  try {
+    const data = {
+      notes: notes,
+      totalPages: totalPages,
+      lastPage: currentPage,
+      selectedFile: selectedFile,
+      savedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(LOCALSTORAGE_KEY, JSON.stringify(data));
+  } catch (error) {
+    console.error('Error saving notes to localStorage:', error);
+  }
+}
+
+function loadNotesFromLocalStorage() {
+  try {
+    const stored = localStorage.getItem(LOCALSTORAGE_KEY);
+    if (stored) {
+      const data = JSON.parse(stored);
+      
+      // Only load if there are actually notes to restore
+      if (data.notes && Object.keys(data.notes).length > 0) {
+        notes = data.notes;
+        
+        // Restore other state if no PDF is loaded
+        if (!pdfDocument) {
+          totalPages = data.totalPages || 100;
+          currentPage = data.lastPage || 1;
+          selectedFile = data.selectedFile || "new_notes";
+        }
+        
+        return true;
+      }
+    }
+  } catch (error) {
+    console.error('Error loading notes from localStorage:', error);
+  }
+  return false;
+}
+
+function clearLocalStorageNotes() {
+  try {
+    localStorage.removeItem(LOCALSTORAGE_KEY);
+  } catch (error) {
+    console.error('Error clearing localStorage notes:', error);
+  }
+}
+
 // Initialize the application
 function initializeApp() {
+  // Try to load notes from localStorage on startup
+  const loaded = loadNotesFromLocalStorage();
+  
   updatePageInfo();
   updateNavigationButtons();
   updateZoomIndicator();
@@ -104,6 +159,33 @@ function initializeApp() {
   updateCanvasCursor();
   loadCurrentPageNote();
   showSyncStatus(true);
+  
+  // Show a subtle indicator if notes were restored
+  if (loaded) {
+    const stored = localStorage.getItem(LOCALSTORAGE_KEY);
+    const data = JSON.parse(stored);
+    const savedDate = new Date(data.savedAt);
+    const now = new Date();
+    const diffMinutes = Math.floor((now - savedDate) / 60000);
+    
+    let timeStr = '';
+    if (diffMinutes < 1) {
+      timeStr = 'just now';
+    } else if (diffMinutes < 60) {
+      timeStr = `${diffMinutes} minute${diffMinutes > 1 ? 's' : ''} ago`;
+    } else if (diffMinutes < 1440) {
+      const hours = Math.floor(diffMinutes / 60);
+      timeStr = `${hours} hour${hours > 1 ? 's' : ''} ago`;
+    } else {
+      const days = Math.floor(diffMinutes / 1440);
+      timeStr = `${days} day${days > 1 ? 's' : ''} ago`;
+    }
+    
+    console.log(`✓ Restored recent notes (saved ${timeStr})`);
+    
+    // Show a toast notification
+    showToast(`📝 Restored recent notes (saved ${timeStr})`);
+  }
 
   // Show placeholder initially
   pdfPlaceholder.style.display = "flex";
@@ -160,6 +242,29 @@ function showSyncStatus(synced) {
     syncIcon.className = "fas fa-exclamation-triangle text-warning";
     syncIcon.title = "Synchronization in progress...";
   }
+}
+
+// Show toast notification
+function showToast(message, duration = 3000) {
+  // Remove existing toast if any
+  const existingToast = document.querySelector('.toast-notification');
+  if (existingToast) {
+    existingToast.remove();
+  }
+  
+  const toast = document.createElement('div');
+  toast.className = 'toast-notification';
+  toast.textContent = message;
+  document.body.appendChild(toast);
+  
+  // Trigger animation
+  setTimeout(() => toast.classList.add('show'), 10);
+  
+  // Remove after duration
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
 }
 
 // Show save confirmation
@@ -972,6 +1077,9 @@ function clearAllNotes() {
   if (isEditingNote) {
     exitEditMode();
   }
+  
+  // Clear localStorage backup
+  clearLocalStorageNotes();
 }
 
 function saveCurrentNote() {
@@ -988,6 +1096,9 @@ function saveCurrentNote() {
   // Only update if content has actually changed
   if (currentContent !== previousContent) {
     notes[currentPage] = currentContent;
+    
+    // Save to localStorage whenever notes change
+    saveNotesToLocalStorage();
   }
 }
 
@@ -1293,6 +1404,9 @@ loadNotesInput.addEventListener("change", async () => {
       // Update current view
       updatePageInfo();
       updateNavigationButtons();
+      
+      // Save loaded notes to localStorage to replace old backup
+      saveNotesToLocalStorage();
     } catch (err) {
       alert("Error loading notes file: " + err.message);
     }
@@ -1347,7 +1461,6 @@ closeBtn.addEventListener("click", () => {
 
   // Reset state
   selectedFile = "new_notes";
-  notes = {};
   currentPage = 1;
   totalPages = 100; // Reset to 100 virtual pages
   currentZoom = 1.0;
@@ -1496,6 +1609,9 @@ filesInput.addEventListener("change", async function () {
         }
         updatePageInfo();
         updateNavigationButtons();
+        
+        // Save loaded notes to localStorage to replace old backup
+        saveNotesToLocalStorage();
       } catch (err) {
         alert("Error loading notes file: " + err.message);
       }
