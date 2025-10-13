@@ -36,6 +36,8 @@ const pdfPlaceholder = document.getElementById("pdf-placeholder");
 const pdfInfo = document.getElementById("pdf-info");
 const pdfName = document.getElementById("pdf-name");
 const pdfPages = document.getElementById("pdf-pages");
+const notesName = document.getElementById("notes-name");
+const notesCount = document.getElementById("notes-count");
 
 // Navigation elements
 const prevPageBtn = document.getElementById("prev-page-btn");
@@ -159,6 +161,9 @@ function initializeApp() {
   updateCanvasCursor();
   loadCurrentPageNote();
   showSyncStatus(true);
+  updateNotesName();
+  updateNotesCount();
+  updateInfoPanel();
   
   // Show a subtle indicator if notes were restored
   if (loaded) {
@@ -229,6 +234,38 @@ function setupShortcutsModal() {
   });
 }
 
+// Update notes name display
+function updateNotesName() {
+  if (notesName) {
+    notesName.textContent = selectedFile;
+  }
+}
+
+// Count notes (pages with non-empty notes)
+function countNotes() {
+  return Object.keys(notes).filter(pageNum => notes[pageNum] && notes[pageNum].trim() !== "").length;
+}
+
+// Update notes count display
+function updateNotesCount() {
+  if (notesCount) {
+    notesCount.textContent = countNotes();
+  }
+}
+
+// Update info panel visibility
+function updateInfoPanel() {
+  // Show info panel if there's a PDF loaded OR if there are notes
+  if (pdfInfo) {
+    const hasNotes = Object.keys(notes).length > 0;
+    if (pdfDocument || hasNotes) {
+      pdfInfo.style.display = "block";
+    } else {
+      pdfInfo.style.display = "none";
+    }
+  }
+}
+
 // Show sync status
 function showSyncStatus(synced) {
   if (synced) {
@@ -282,6 +319,7 @@ pdfInput.addEventListener("change", async function () {
   const file = pdfInput.files[0];
 
   selectedFile = file ? file.name.replace(/\.pdf$/i, "") : "new_notes";
+  updateNotesName();
 
   if (file && file.type === "application/pdf") {
     // Load PDF without clearing notes - keeps notes from previous sessions
@@ -317,7 +355,7 @@ async function loadPDF(file) {
     // Update UI
     pdfName.textContent = file.name;
     pdfPages.textContent = totalPages;
-    if (pdfInfo) pdfInfo.style.display = "block";
+    updateInfoPanel(); // Use updateInfoPanel instead of direct display
 
     // Show PDF viewer and hide placeholder
     pdfPlaceholder.style.display = "none";
@@ -330,6 +368,7 @@ async function loadPDF(file) {
     updatePageInfo();
     updateNavigationButtons();
     loadCurrentPageNote();
+    updateNotesCount();
 
     showSyncStatus(true);
   } catch (error) {
@@ -1059,6 +1098,10 @@ function clearAllNotes() {
   
   // Clear localStorage backup
   clearLocalStorageNotes();
+  
+  // Update notes count and info panel
+  updateNotesCount();
+  updateInfoPanel();
 }
 
 function saveCurrentNote() {
@@ -1078,6 +1121,9 @@ function saveCurrentNote() {
     
     // Save to localStorage whenever notes change
     saveNotesToLocalStorage();
+    
+    // Update notes count
+    updateNotesCount();
   }
 }
 
@@ -1383,6 +1429,8 @@ loadNotesInput.addEventListener("change", async () => {
       // Update current view
       updatePageInfo();
       updateNavigationButtons();
+      updateNotesCount();
+      updateInfoPanel();
       
       // Save loaded notes to localStorage to replace old backup
       saveNotesToLocalStorage();
@@ -1440,6 +1488,7 @@ closeBtn.addEventListener("click", () => {
 
   // Reset state
   selectedFile = "new_notes";
+  updateNotesName();
   currentPage = 1;
   totalPages = 100; // Reset to 100 virtual pages
   currentZoom = 1.0;
@@ -1552,6 +1601,7 @@ filesInput.addEventListener("change", async function () {
   if (pdfFile) {
     // Set the selected file name for saving notes
     selectedFile = pdfFile.name.replace(/\.pdf$/i, "");
+    updateNotesName();
     // Load PDF without clearing notes - only clear if notes file is also provided
     if (!eznFile) {
       // If no notes file is provided, keep existing notes
@@ -1594,6 +1644,8 @@ filesInput.addEventListener("change", async function () {
         }
         updatePageInfo();
         updateNavigationButtons();
+        updateNotesCount();
+        updateInfoPanel();
         
         // Save loaded notes to localStorage to replace old backup
         saveNotesToLocalStorage();

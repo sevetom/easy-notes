@@ -148,11 +148,22 @@
                                 </div>
                             </div>
                             <div class="pdf-info mb-3" id="pdf-info" style="display: none;">
-                                <small class="text-muted">
-                                    <i class="fas fa-file-pdf"></i>
-                                    <span id="pdf-name">No PDF loaded</span>
-                                    (<span id="pdf-pages">0</span> pages)
-                                </small>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <small class="text-muted d-block">
+                                            <i class="fas fa-file-pdf"></i>
+                                            <span id="pdf-name">No PDF loaded</span>
+                                            (<span id="pdf-pages">0</span> pages)
+                                        </small>
+                                    </div>
+                                    <div class="col-6">
+                                        <small class="text-muted d-block">
+                                            <i class="fas fa-file-text"></i>
+                                            <span id="notes-name">new_notes</span>
+                                            (<span id="notes-count">0</span> notes)
+                                        </small>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         <div id="notes-container" class="notes-editor-container">
