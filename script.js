@@ -49,6 +49,7 @@ const zoomOutBtn = document.getElementById("zoom-out-btn");
 const zoomInfo = document.getElementById("zoom-info");
 const fitToWidthBtn = document.getElementById("fit-to-width-btn");
 const highlightBtn = document.getElementById("highlight-btn");
+const textboxBtn = document.getElementById("textbox-btn");
 const savePdfBtn = document.getElementById("save-pdf-btn");
 
 // Notes elements
@@ -91,6 +92,15 @@ let isHighlightMode = false;
 let highlights = {}; // Store highlights by page
 let isSelecting = false;
 
+// Textbox state
+let isTextboxMode = false;
+let textboxes = {}; // Store textboxes by page
+let isDrawingTextbox = false;
+let textboxStartX = 0;
+let textboxStartY = 0;
+let currentTextbox = null;
+let isEditingTextbox = false;
+
 // Search state
 let searchResults = [];
 let currentSearchIndex = -1;
@@ -104,6 +114,8 @@ function saveNotesToLocalStorage() {
   try {
     const data = {
       notes: notes,
+      highlights: serializeHighlights(),
+      textboxes: serializeTextboxes(),
       totalPages: totalPages,
       lastPage: currentPage,
       selectedFile: selectedFile,
@@ -115,6 +127,64 @@ function saveNotesToLocalStorage() {
   }
 }
 
+function serializeHighlights() {
+  const serialized = {};
+  for (const [page, pageHighlights] of Object.entries(highlights)) {
+    serialized[page] = pageHighlights.map(h => ({
+      text: h.text,
+      rects: h.rects,
+      scale: h.scale
+    }));
+  }
+  return serialized;
+}
+
+function serializeTextboxes() {
+  const serialized = {};
+  for (const [page, pageTextboxes] of Object.entries(textboxes)) {
+    serialized[page] = pageTextboxes.map(t => ({
+      left: t.left,
+      top: t.top,
+      width: t.width,
+      height: t.height,
+      text: t.text,
+      fontSize: t.fontSize,
+      scale: t.scale
+    }));
+  }
+  return serialized;
+}
+
+function deserializeHighlights(serializedHighlights) {
+  const deserialized = {};
+  for (const [page, pageHighlights] of Object.entries(serializedHighlights)) {
+    deserialized[page] = pageHighlights.map(h => ({
+      text: h.text,
+      rects: h.rects,
+      scale: h.scale,
+      elements: [] // Will be recreated when page is rendered
+    }));
+  }
+  return deserialized;
+}
+
+function deserializeTextboxes(serializedTextboxes) {
+  const deserialized = {};
+  for (const [page, pageTextboxes] of Object.entries(serializedTextboxes)) {
+    deserialized[page] = pageTextboxes.map(t => ({
+      left: t.left,
+      top: t.top,
+      width: t.width,
+      height: t.height,
+      text: t.text,
+      fontSize: t.fontSize,
+      scale: t.scale,
+      element: null // Will be recreated when page is rendered
+    }));
+  }
+  return deserialized;
+}
+
 function loadNotesFromLocalStorage() {
   try {
     const stored = localStorage.getItem(LOCALSTORAGE_KEY);
@@ -124,6 +194,16 @@ function loadNotesFromLocalStorage() {
       // Only load if there are actually notes to restore
       if (data.notes && Object.keys(data.notes).length > 0) {
         notes = data.notes;
+        
+        // Load highlights if available
+        if (data.highlights) {
+          highlights = deserializeHighlights(data.highlights);
+        }
+        
+        // Load textboxes if available
+        if (data.textboxes) {
+          textboxes = deserializeTextboxes(data.textboxes);
+        }
         
         // Restore other state if no PDF is loaded
         if (!pdfDocument) {
@@ -343,6 +423,9 @@ async function loadPDF(file) {
 
     // Reset highlights for new PDF
     highlights = {};
+    
+    // Reset textboxes for new PDF
+    textboxes = {};
 
     // Clear PDF text content cache and search results
     pdfTextContent = {};
@@ -429,6 +512,8 @@ async function renderPage(pageNum) {
           highlightSearchResult(currentResult);
         }
       }
+      // Restore textboxes for this page
+      restoreTextboxes();
     }, 100);
 
     showSyncStatus(true);
@@ -456,6 +541,7 @@ function setupPanning() {
       e.button === 0 &&
       currentZoom > 1.0 &&
       !isHighlightMode &&
+      !isTextboxMode &&
       (e.altKey || e.target === pdfCanvas) // Only pan with Alt key or when clicking on canvas (not text layer)
     ) {
       // Left mouse button and zoomed in
@@ -732,6 +818,313 @@ function mergeGroup(group) {
   return merged;
 }
 
+// Textbox functions
+function toggleTextboxMode() {
+  isTextboxMode = !isTextboxMode;
+
+  textboxBtn.classList.toggle("active", isTextboxMode);
+
+  if (isTextboxMode) {
+    // Disable highlighting and panning when in textbox mode
+    if (isHighlightMode) {
+      toggleHighlightMode();
+    }
+    pdfViewer.style.cursor = "crosshair";
+    setupTextboxDrawing();
+  } else {
+    // Re-enable normal cursor
+    pdfViewer.style.cursor = currentZoom > 1.0 ? "grab" : "default";
+    cleanupTextboxDrawing();
+  }
+}
+
+function setupTextboxDrawing() {
+  textLayer.addEventListener("mousedown", startTextboxDrawing);
+  textLayer.addEventListener("mousemove", drawTextbox);
+  textLayer.addEventListener("mouseup", endTextboxDrawing);
+}
+
+function cleanupTextboxDrawing() {
+  textLayer.removeEventListener("mousedown", startTextboxDrawing);
+  textLayer.removeEventListener("mousemove", drawTextbox);
+  textLayer.removeEventListener("mouseup", endTextboxDrawing);
+}
+
+function startTextboxDrawing(e) {
+  if (!isTextboxMode || isEditingTextbox) return;
+  
+  // Check if clicking on existing textbox
+  if (e.target.classList.contains('user-textbox') || e.target.closest('.user-textbox')) {
+    return;
+  }
+  
+  isDrawingTextbox = true;
+  
+  const textLayerRect = textLayer.getBoundingClientRect();
+  textboxStartX = e.clientX - textLayerRect.left;
+  textboxStartY = e.clientY - textLayerRect.top;
+  
+  // Create temporary textbox element
+  currentTextbox = document.createElement("div");
+  currentTextbox.className = "user-textbox user-textbox-drawing";
+  currentTextbox.style.position = "absolute";
+  currentTextbox.style.left = textboxStartX + "px";
+  currentTextbox.style.top = textboxStartY + "px";
+  currentTextbox.style.width = "0px";
+  currentTextbox.style.height = "0px";
+  
+  textLayer.appendChild(currentTextbox);
+  
+  e.preventDefault();
+}
+
+function drawTextbox(e) {
+  if (!isDrawingTextbox || !currentTextbox) return;
+  
+  const textLayerRect = textLayer.getBoundingClientRect();
+  const currentX = e.clientX - textLayerRect.left;
+  const currentY = e.clientY - textLayerRect.top;
+  
+  const width = Math.abs(currentX - textboxStartX);
+  const height = Math.abs(currentY - textboxStartY);
+  
+  const left = Math.min(textboxStartX, currentX);
+  const top = Math.min(textboxStartY, currentY);
+  
+  currentTextbox.style.left = left + "px";
+  currentTextbox.style.top = top + "px";
+  currentTextbox.style.width = width + "px";
+  currentTextbox.style.height = height + "px";
+}
+
+function endTextboxDrawing(e) {
+  if (!isDrawingTextbox || !currentTextbox) return;
+  
+  isDrawingTextbox = false;
+  
+  const width = parseFloat(currentTextbox.style.width);
+  const height = parseFloat(currentTextbox.style.height);
+  
+  // Minimum size threshold
+  if (width < 30 || height < 20) {
+    currentTextbox.remove();
+    currentTextbox = null;
+    return;
+  }
+  
+  // Remove drawing class
+  currentTextbox.classList.remove("user-textbox-drawing");
+  
+  // Create textbox data
+  const textboxData = {
+    element: currentTextbox,
+    left: parseFloat(currentTextbox.style.left),
+    top: parseFloat(currentTextbox.style.top),
+    width: width,
+    height: height,
+    text: "",
+    fontSize: Math.min(16, Math.max(10, height / 3)), // Auto-size font
+    scale: currentZoom
+  };
+  
+  // Add contenteditable div for text
+  const textContent = document.createElement("div");
+  textContent.className = "textbox-content";
+  textContent.contentEditable = "false";
+  textContent.style.fontSize = textboxData.fontSize + "px";
+  textContent.textContent = "";
+  
+  currentTextbox.appendChild(textContent);
+  
+  // Add event listeners
+  currentTextbox.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (isTextboxMode) {
+      removeTextbox(textboxData);
+    }
+  });
+  
+  currentTextbox.addEventListener("dblclick", (e) => {
+    e.stopPropagation();
+    editTextbox(textboxData, textContent);
+  });
+  
+  // Store textbox
+  const pageTextboxes = textboxes[currentPage] || [];
+  pageTextboxes.push(textboxData);
+  textboxes[currentPage] = pageTextboxes;
+  
+  currentTextbox = null;
+  
+  // Immediately open for editing
+  editTextbox(textboxData, textContent);
+}
+
+function editTextbox(textboxData, textContent) {
+  if (isEditingTextbox) return;
+  
+  isEditingTextbox = true;
+  textContent.contentEditable = "true";
+  textContent.focus();
+  
+  // Select all text
+  const range = document.createRange();
+  range.selectNodeContents(textContent);
+  const selection = window.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(range);
+  
+  textboxData.element.classList.add("editing");
+  
+  // Store original dimensions
+  const originalWidth = textboxData.width;
+  const originalHeight = textboxData.height;
+  
+  // Function to auto-resize textbox as user types
+  const autoResize = () => {
+    const textbox = textboxData.element;
+    const currentWidth = parseFloat(textbox.style.width);
+    const currentHeight = parseFloat(textbox.style.height);
+    
+    // Check if content overflows
+    if (textContent.scrollWidth > textContent.clientWidth) {
+      // Expand width
+      const newWidth = textContent.scrollWidth + 20; // Add padding
+      textbox.style.width = newWidth + "px";
+      textboxData.width = newWidth;
+    }
+    
+    if (textContent.scrollHeight > textContent.clientHeight) {
+      // Expand height
+      const newHeight = textContent.scrollHeight + 10; // Add padding
+      textbox.style.height = newHeight + "px";
+      textboxData.height = newHeight;
+    }
+  };
+  
+  // Function to shrink textbox to minimum size that fits content
+  const shrinkToFit = () => {
+    const textbox = textboxData.element;
+    
+    // Get current dimensions (which may have been expanded during editing)
+    const currentWidth = parseFloat(textbox.style.width);
+    const currentHeight = parseFloat(textbox.style.height);
+    
+    // If there's no text, shrink to minimum
+    if (!textContent.textContent || textContent.textContent.trim() === "") {
+      const minWidth = 50;
+      const minHeight = 30;
+      textbox.style.width = minWidth + "px";
+      textbox.style.height = minHeight + "px";
+      textboxData.width = minWidth;
+      textboxData.height = minHeight;
+      return;
+    }
+    
+    // Create a temporary element to measure text size
+    // Use current width as max-width to respect word wrapping
+    const temp = document.createElement("div");
+    temp.style.position = "absolute";
+    temp.style.visibility = "hidden";
+    temp.style.maxWidth = currentWidth + "px";
+    temp.style.width = "max-content";
+    temp.style.height = "auto";
+    temp.style.fontSize = textContent.style.fontSize;
+    temp.style.fontFamily = window.getComputedStyle(textContent).fontFamily;
+    temp.style.padding = window.getComputedStyle(textContent).padding;
+    temp.style.whiteSpace = "pre-wrap";
+    temp.style.wordBreak = "break-word";
+    temp.style.boxSizing = window.getComputedStyle(textContent).boxSizing;
+    temp.textContent = textContent.textContent;
+    
+    document.body.appendChild(temp);
+    
+    // Measure content size with some padding
+    const contentWidth = Math.max(50, temp.offsetWidth + 10);
+    const contentHeight = Math.max(30, temp.offsetHeight + 10);
+    
+    document.body.removeChild(temp);
+    
+    // Set to content size
+    textbox.style.width = contentWidth + "px";
+    textbox.style.height = contentHeight + "px";
+    textboxData.width = contentWidth;
+    textboxData.height = contentHeight;
+  };
+  
+  const finishEditing = () => {
+    textContent.contentEditable = "false";
+    textboxData.text = textContent.textContent;
+    textboxData.element.classList.remove("editing");
+    isEditingTextbox = false;
+    
+    // Shrink textbox to fit content after editing
+    shrinkToFit();
+    
+    // Remove listeners
+    textContent.removeEventListener("blur", finishEditing);
+    textContent.removeEventListener("keydown", handleEditingKeys);
+    textContent.removeEventListener("input", autoResize);
+  };
+  
+  const handleEditingKeys = (e) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      finishEditing();
+    }
+    e.stopPropagation(); // Prevent other keyboard shortcuts
+  };
+  
+  textContent.addEventListener("blur", finishEditing);
+  textContent.addEventListener("keydown", handleEditingKeys);
+  textContent.addEventListener("input", autoResize);
+}
+
+function removeTextbox(textboxData) {
+  const pageTextboxes = textboxes[currentPage] || [];
+  const index = pageTextboxes.findIndex((t) => t === textboxData);
+  if (index > -1) {
+    pageTextboxes.splice(index, 1);
+    textboxData.element.remove();
+  }
+}
+
+function restoreTextboxes() {
+  const pageTextboxes = textboxes[currentPage] || [];
+  pageTextboxes.forEach((textboxData) => {
+    const textbox = document.createElement("div");
+    textbox.className = "user-textbox";
+    textbox.style.position = "absolute";
+    textbox.style.left = textboxData.left + "px";
+    textbox.style.top = textboxData.top + "px";
+    textbox.style.width = textboxData.width + "px";
+    textbox.style.height = textboxData.height + "px";
+    
+    const textContent = document.createElement("div");
+    textContent.className = "textbox-content";
+    textContent.contentEditable = "false";
+    textContent.style.fontSize = textboxData.fontSize + "px";
+    textContent.textContent = textboxData.text || "";
+    
+    textbox.appendChild(textContent);
+    
+    textbox.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (isTextboxMode) {
+        removeTextbox(textboxData);
+      }
+    });
+    
+    textbox.addEventListener("dblclick", (e) => {
+      e.stopPropagation();
+      editTextbox(textboxData, textContent);
+    });
+    
+    textLayer.appendChild(textbox);
+    textboxData.element = textbox;
+  });
+}
+
 async function savePdfWithHighlights() {
   // Use ArrayBuffer as backup if Uint8Array is empty
   let pdfData = originalPdfBytes;
@@ -745,15 +1138,19 @@ async function savePdfWithHighlights() {
   }
 
   try {
-    // Check if there are any highlights to embed
+    // Check if there are any highlights or textboxes to embed
     const hasHighlights = Object.keys(highlights).length > 0;
+    const hasTextboxes = Object.keys(textboxes).length > 0;
 
-    if (hasHighlights) {
-      // Use PDF-lib to embed highlights
+    if (hasHighlights || hasTextboxes) {
+      // Use PDF-lib to embed highlights and textboxes
       const pdfDoc = await PDFLib.PDFDocument.load(pdfData);
 
       // Get all pages
       const pages = pdfDoc.getPages();
+      
+      // Embed a standard font for textboxes
+      const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
 
       // Add highlights to each page
       for (const [pageNum, pageHighlights] of Object.entries(highlights)) {
@@ -798,6 +1195,55 @@ async function savePdfWithHighlights() {
           }
         }
       }
+      
+      // Add textboxes to each page
+      for (const [pageNum, pageTextboxes] of Object.entries(textboxes)) {
+        const pageIndex = parseInt(pageNum) - 1; // Convert to 0-based index
+        if (pageIndex >= 0 && pageIndex < pages.length) {
+          const page = pages[pageIndex];
+          
+          // Get the original page from the PDF document
+          const originalPage = await pdfDocument.getPage(pageIndex + 1);
+          const originalViewport = originalPage.getViewport({ scale: 1.0 });
+
+          // Add each textbox on this page
+          for (const textbox of pageTextboxes) {
+            if (!textbox.text || textbox.text.trim() === "") continue; // Skip empty textboxes
+            
+            const textboxScale = textbox.scale || 1.0;
+            
+            // Convert from text layer coordinates to PDF coordinates
+            const pdfX = textbox.left / textboxScale;
+            const pdfY = originalViewport.height - (textbox.top / textboxScale) - (textbox.height / textboxScale);
+            const pdfWidth = textbox.width / textboxScale;
+            const pdfHeight = textbox.height / textboxScale;
+            
+            // Draw border only (transparent background)
+            page.drawRectangle({
+              x: pdfX,
+              y: pdfY,
+              width: pdfWidth,
+              height: pdfHeight,
+              borderColor: PDFLib.rgb(0, 0, 0), // Black border
+              borderWidth: 1,
+              opacity: 0, // Transparent fill
+            });
+            
+            // Draw text
+            const fontSize = (textbox.fontSize || 12) / textboxScale;
+            const textY = pdfY + pdfHeight - fontSize - 5; // Position text from top with padding
+            
+            page.drawText(textbox.text, {
+              x: pdfX + 5, // Left padding
+              y: textY,
+              size: fontSize,
+              font: font,
+              color: PDFLib.rgb(0, 0, 0), // Black text
+              maxWidth: pdfWidth - 10, // Account for padding
+            });
+          }
+        }
+      }
 
       // Save the modified PDF
       const pdfBytes = await pdfDoc.save();
@@ -812,9 +1258,12 @@ async function savePdfWithHighlights() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      alert("PDF saved with highlights embedded!");
+      const features = [];
+      if (hasHighlights) features.push("highlights");
+      if (hasTextboxes) features.push("textboxes");
+      alert(`PDF saved with ${features.join(" and ")} embedded!`);
     } else {
-      // No highlights, just save the original PDF
+      // No highlights or textboxes, just save the original PDF
       const blob = new Blob([pdfData], { type: "application/pdf" });
       const url = URL.createObjectURL(blob);
 
@@ -826,7 +1275,7 @@ async function savePdfWithHighlights() {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      alert("PDF saved! (No highlights to embed)");
+      alert("PDF saved! (No highlights or textboxes to embed)");
     }
   } catch (error) {
     console.error("Error saving PDF:", error);
@@ -950,7 +1399,9 @@ async function fitToWidth() {
 
 // Update cursor based on zoom level
 function updateCanvasCursor() {
-  if (isHighlightMode) {
+  if (isTextboxMode) {
+    pdfViewer.style.cursor = "crosshair";
+  } else if (isHighlightMode) {
     pdfViewer.style.cursor = "text";
   } else {
     pdfViewer.style.cursor = "default";
@@ -958,7 +1409,7 @@ function updateCanvasCursor() {
   
   // Set cursor on canvas specifically for panning when zoomed
   if (pdfCanvas) {
-    if (currentZoom > 1.0 && !isHighlightMode) {
+    if (currentZoom > 1.0 && !isHighlightMode && !isTextboxMode) {
       pdfCanvas.style.cursor = "grab";
     } else {
       pdfCanvas.style.cursor = "inherit";
@@ -1039,6 +1490,7 @@ searchNextBtn.addEventListener("click", searchNext);
 searchPrevBtn.addEventListener("click", searchPrevious);
 zoomInfo.addEventListener("click", zoomReset);
 highlightBtn.addEventListener("click", toggleHighlightMode);
+textboxBtn.addEventListener("click", toggleTextboxMode);
 savePdfBtn.addEventListener("click", savePdfWithHighlights);
 
 // Mouse wheel zoom on PDF viewer
@@ -1403,6 +1855,16 @@ loadNotesInput.addEventListener("change", async () => {
           notes[pageNum] = data.notes[key];
         }
       });
+      
+      // Load highlights if available
+      if (data.highlights) {
+        highlights = deserializeHighlights(data.highlights);
+      }
+      
+      // Load textboxes if available
+      if (data.textboxes) {
+        textboxes = deserializeTextboxes(data.textboxes);
+      }
 
       // Calculate the maximum page number from loaded notes
       const notePageNumbers = Object.keys(notes).map(Number).filter(n => !isNaN(n) && n > 0);
@@ -1451,6 +1913,8 @@ saveNotesBtn.addEventListener("click", () => {
 
   const data = {
     notes: notes,
+    highlights: serializeHighlights(),
+    textboxes: serializeTextboxes(),
     totalPages: totalPages,
     lastPage: currentPage,
     savedAt: new Date().toISOString(),
@@ -1496,6 +1960,8 @@ closeBtn.addEventListener("click", () => {
   panOffsetY = 0;
   isHighlightMode = false;
   highlights = {};
+  isTextboxMode = false;
+  textboxes = {};
 
   // Clear search state
   pdfTextContent = {};
@@ -1507,6 +1973,7 @@ closeBtn.addEventListener("click", () => {
 
   // Reset UI
   highlightBtn.classList.remove("active");
+  textboxBtn.classList.remove("active");
 
   // Hide PDF and show placeholder
   pdfViewer.style.display = "none";
