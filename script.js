@@ -405,13 +405,26 @@ function showSaveConfirmation() {
 pdfInput.addEventListener("change", async function () {
   const file = pdfInput.files[0];
 
-  selectedFile = file ? file.name.replace(/\.pdf$/i, "") : "new_notes";
-  updateNotesName();
-
   if (file && file.type === "application/pdf") {
-    // Load PDF without clearing notes - keeps notes from previous sessions
+    // Set the selected file name from PDF
+    selectedFile = file.name.replace(/\.pdf$/i, "");
+    updateNotesName();
+    
+    // Check if there are any existing notes
+    const hasNotes = Object.keys(notes).some(pageNum => notes[pageNum] && notes[pageNum].trim() !== "");
+    
+    if (!hasNotes) {
+      // No notes loaded: create empty notes with PDF name
+      clearAllNotes();
+    }
+    // If notes exist, keep them but use PDF name
+    
+    // Load the new PDF (closes previous PDF if any)
     await loadPDF(file);
   }
+  
+  // Reset input
+  pdfInput.value = '';
 });
 
 // Load PDF using PDF.js with text layer
@@ -1942,6 +1955,8 @@ loadNotesInput.addEventListener("change", async () => {
 
       // Clear current notes first to avoid conflicts
       notes = {};
+      highlights = {};
+      textboxes = {};
 
       // Only support new format with metadata
       if (!data.notes || typeof data.notes !== "object") {
@@ -1965,6 +1980,20 @@ loadNotesInput.addEventListener("change", async () => {
       // Load textboxes if available
       if (data.textboxes) {
         textboxes = deserializeTextboxes(data.textboxes);
+      }
+
+      // Set selectedFile name based on whether PDF is loaded
+      if (pdfDocument) {
+        // PDF is loaded: keep PDF name for notes
+        // selectedFile already set from PDF, don't change it
+      } else {
+        // No PDF loaded: use notes file name and reset PDF display
+        selectedFile = file.name.replace(/\.ezn$/i, "");
+        updateNotesName();
+        
+        // Reset PDF info display
+        pdfName.textContent = "No PDF loaded";
+        pdfPages.textContent = "0";
       }
 
       // Calculate the maximum page number from loaded notes
@@ -2165,57 +2194,143 @@ filesInput.addEventListener("change", async function () {
     }
   }
 
-  // Load PDF if present
-  if (pdfFile) {
-    // Set the selected file name for saving notes
+  // If only one type is loaded, reset the other
+  if (pdfFile && !eznFile) {
+    // Only PDF: reset notes
+    clearAllNotes();
     selectedFile = pdfFile.name.replace(/\.pdf$/i, "");
     updateNotesName();
-    // Load PDF without clearing notes - only clear if notes file is also provided
-    if (!eznFile) {
-      // If no notes file is provided, keep existing notes
-      await loadPDF(pdfFile);
-    } else {
-      // If notes file is provided, clear notes first (will be loaded from file)
-      clearAllNotes();
-      await loadPDF(pdfFile);
+    await loadPDF(pdfFile);
+  } else if (eznFile && !pdfFile) {
+    // Only notes: reset PDF (close PDF if loaded)
+    if (pdfDocument) {
+      // Close PDF
+      pdfDocument = null;
+      originalPdfBytes = null;
+      originalPdfArrayBuffer = null;
+      pdfPlaceholder.style.display = "flex";
+      pdfViewer.style.display = "none";
     }
-  }
-
-  // Load notes if present
-  if (eznFile) {
+    
+    // Reset PDF info display
+    pdfName.textContent = "No PDF loaded";
+    pdfPages.textContent = "0";
+    
+    // Set notes name from file
+    selectedFile = eznFile.name.replace(/\.ezn$/i, "");
+    updateNotesName();
+    
+    // Clear and load notes
+    clearAllNotes();
+    
     const reader = new FileReader();
     reader.onload = async (e) => {
       try {
         const data = JSON.parse(e.target.result);
-        notes = {};
+        
         if (!data.notes || typeof data.notes !== "object") {
           throw new Error("Invalid notes file format. Expected format: { notes: {...}, totalPages: ..., lastPage: ... }");
         }
-        notes = JSON.parse(JSON.stringify(data.notes));
+        
+        // Load notes
+        Object.keys(data.notes).forEach(key => {
+          const pageNum = parseInt(key);
+          if (!isNaN(pageNum) && pageNum > 0) {
+            notes[pageNum] = data.notes[key];
+          }
+        });
+        
+        // Load highlights if available
+        if (data.highlights) {
+          highlights = deserializeHighlights(data.highlights);
+        }
+        
+        // Load textboxes if available
+        if (data.textboxes) {
+          textboxes = deserializeTextboxes(data.textboxes);
+        }
+        
+        // Notes name already set before loading
+        // (selectedFile was set from eznFile.name before clearAllNotes)
+        
+        // Update total pages
         const notePageNumbers = Object.keys(notes).map(Number).filter(n => !isNaN(n) && n > 0);
         const maxNotePageNumber = notePageNumbers.length > 0 ? Math.max(...notePageNumbers) : 0;
-        if (!pdfDocument) {
-          if (data.totalPages) {
-            totalPages = Math.max(data.totalPages, maxNotePageNumber || 1, totalPages);
-          } else {
-            totalPages = Math.max(maxNotePageNumber || 1, totalPages);
-          }
+        
+        if (data.totalPages) {
+          totalPages = Math.max(data.totalPages, maxNotePageNumber || 1, totalPages);
+        } else {
+          totalPages = Math.max(maxNotePageNumber || 1, totalPages);
         }
+        
+        // Restore last page if available
         if (data.lastPage && data.lastPage <= totalPages) {
-          if (data.lastPage === currentPage) {
-            loadCurrentPageNote();
-          } else {
-            await goToPage(data.lastPage);
-          }
+          await goToPage(data.lastPage);
         } else {
           loadCurrentPageNote();
         }
+        
         updatePageInfo();
         updateNavigationButtons();
         updateNotesCount();
         updateInfoPanel();
+        saveNotesToLocalStorage();
+      } catch (err) {
+        alert("Error loading notes file: " + err.message);
+      }
+      filesInput.value = '';
+    };
+    reader.readAsText(eznFile);
+  } else if (pdfFile && eznFile) {
+    // Both files: load both
+    selectedFile = pdfFile.name.replace(/\.pdf$/i, "");
+    updateNotesName();
+    
+    // Clear everything first
+    clearAllNotes();
+    
+    // Load PDF first
+    await loadPDF(pdfFile);
+    
+    // Then load notes
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const data = JSON.parse(e.target.result);
         
-        // Save loaded notes to localStorage to replace old backup
+        if (!data.notes || typeof data.notes !== "object") {
+          throw new Error("Invalid notes file format. Expected format: { notes: {...}, totalPages: ..., lastPage: ... }");
+        }
+        
+        notes = {};
+        Object.keys(data.notes).forEach(key => {
+          const pageNum = parseInt(key);
+          if (!isNaN(pageNum) && pageNum > 0) {
+            notes[pageNum] = data.notes[key];
+          }
+        });
+        
+        // Load highlights if available
+        if (data.highlights) {
+          highlights = deserializeHighlights(data.highlights);
+        }
+        
+        // Load textboxes if available
+        if (data.textboxes) {
+          textboxes = deserializeTextboxes(data.textboxes);
+        }
+        
+        // Restore last page if available
+        if (data.lastPage && data.lastPage <= totalPages) {
+          await goToPage(data.lastPage);
+        } else {
+          loadCurrentPageNote();
+        }
+        
+        updatePageInfo();
+        updateNavigationButtons();
+        updateNotesCount();
+        updateInfoPanel();
         saveNotesToLocalStorage();
       } catch (err) {
         alert("Error loading notes file: " + err.message);
@@ -2224,6 +2339,7 @@ filesInput.addEventListener("change", async function () {
     };
     reader.readAsText(eznFile);
   } else {
+    // No valid files
     filesInput.value = '';
   }
 });
