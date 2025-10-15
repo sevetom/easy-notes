@@ -98,6 +98,13 @@ let textboxes = {}; // Store textboxes by page
 let isDrawingTextbox = false;
 let textboxStartX = 0;
 let textboxStartY = 0;
+
+// Textbox dragging state
+let isDraggingTextbox = false;
+let draggedTextbox = null;
+let draggedTextboxData = null;
+let dragOffsetX = 0;
+let dragOffsetY = 0;
 let currentTextbox = null;
 let isEditingTextbox = false;
 
@@ -559,22 +566,28 @@ function setupPanning() {
       panOffsetY = e.clientY - panStartY;
       updatePanTransform();
       e.preventDefault();
+    } else if (isDraggingTextbox) {
+      dragTextbox(e);
     }
   });
 
-  viewer.addEventListener("mouseup", () => {
+  viewer.addEventListener("mouseup", (e) => {
     if (isPanning) {
       isPanning = false;
       viewer.classList.remove("panning");
       updateCanvasCursor();
+    } else if (isDraggingTextbox) {
+      endTextboxDrag(e);
     }
   });
 
-  viewer.addEventListener("mouseleave", () => {
+  viewer.addEventListener("mouseleave", (e) => {
     if (isPanning) {
       isPanning = false;
       viewer.classList.remove("panning");
       updateCanvasCursor();
+    } else if (isDraggingTextbox) {
+      endTextboxDrag(e);
     }
   });
 }
@@ -831,11 +844,24 @@ function toggleTextboxMode() {
     }
     pdfViewer.style.cursor = "crosshair";
     setupTextboxDrawing();
+    // Update cursor for existing textboxes to pointer (for deletion)
+    updateTextboxCursors("pointer");
   } else {
     // Re-enable normal cursor
     pdfViewer.style.cursor = currentZoom > 1.0 ? "grab" : "default";
     cleanupTextboxDrawing();
+    // Update cursor for existing textboxes to grab (for dragging)
+    updateTextboxCursors("grab");
   }
+}
+
+function updateTextboxCursors(cursorStyle) {
+  const pageTextboxes = textboxes[currentPage] || [];
+  pageTextboxes.forEach((textboxData) => {
+    if (textboxData.element && !textboxData.element.classList.contains('editing')) {
+      textboxData.element.style.cursor = cursorStyle;
+    }
+  });
 }
 
 function setupTextboxDrawing() {
@@ -915,6 +941,9 @@ function endTextboxDrawing(e) {
   // Remove drawing class
   currentTextbox.classList.remove("user-textbox-drawing");
   
+  // Set cursor based on current mode
+  currentTextbox.style.cursor = isTextboxMode ? "pointer" : "grab";
+  
   // Create textbox data
   const textboxData = {
     element: currentTextbox,
@@ -947,6 +976,13 @@ function endTextboxDrawing(e) {
   currentTextbox.addEventListener("dblclick", (e) => {
     e.stopPropagation();
     editTextbox(textboxData, textContent);
+  });
+  
+  // Add drag and drop listener for when NOT in textbox mode
+  currentTextbox.addEventListener("mousedown", (e) => {
+    if (!isTextboxMode && !isEditingTextbox) {
+      startTextboxDrag(e, textboxData);
+    }
   });
   
   // Store textbox
@@ -1089,6 +1125,62 @@ function removeTextbox(textboxData) {
   }
 }
 
+// Textbox drag and drop functions
+function startTextboxDrag(e, textboxData) {
+  if (isTextboxMode || isEditingTextbox) return; // Don't drag when in textbox mode or editing
+  
+  isDraggingTextbox = true;
+  draggedTextbox = textboxData.element;
+  draggedTextboxData = textboxData;
+  
+  const textLayerRect = textLayer.getBoundingClientRect();
+  dragOffsetX = e.clientX - textLayerRect.left - textboxData.left;
+  dragOffsetY = e.clientY - textLayerRect.top - textboxData.top;
+  
+  // Add dragging class for visual feedback
+  draggedTextbox.classList.add('dragging');
+  draggedTextbox.style.cursor = 'grabbing';
+  
+  e.preventDefault();
+  e.stopPropagation();
+}
+
+function dragTextbox(e) {
+  if (!isDraggingTextbox || !draggedTextbox || !draggedTextboxData) return;
+  
+  const textLayerRect = textLayer.getBoundingClientRect();
+  let newLeft = e.clientX - textLayerRect.left - dragOffsetX;
+  let newTop = e.clientY - textLayerRect.top - dragOffsetY;
+  
+  // Keep textbox within bounds
+  newLeft = Math.max(0, Math.min(newLeft, textLayerRect.width - draggedTextboxData.width));
+  newTop = Math.max(0, Math.min(newTop, textLayerRect.height - draggedTextboxData.height));
+  
+  draggedTextbox.style.left = newLeft + "px";
+  draggedTextbox.style.top = newTop + "px";
+  
+  e.preventDefault();
+}
+
+function endTextboxDrag(e) {
+  if (!isDraggingTextbox || !draggedTextbox || !draggedTextboxData) return;
+  
+  // Update textbox data with new position
+  draggedTextboxData.left = parseFloat(draggedTextbox.style.left);
+  draggedTextboxData.top = parseFloat(draggedTextbox.style.top);
+  
+  // Remove dragging class
+  draggedTextbox.classList.remove('dragging');
+  draggedTextbox.style.cursor = 'grab';
+  
+  isDraggingTextbox = false;
+  draggedTextbox = null;
+  draggedTextboxData = null;
+  
+  e.preventDefault();
+  e.stopPropagation();
+}
+
 function restoreTextboxes() {
   const pageTextboxes = textboxes[currentPage] || [];
   pageTextboxes.forEach((textboxData) => {
@@ -1099,6 +1191,8 @@ function restoreTextboxes() {
     textbox.style.top = textboxData.top + "px";
     textbox.style.width = textboxData.width + "px";
     textbox.style.height = textboxData.height + "px";
+    // Set cursor based on current mode
+    textbox.style.cursor = isTextboxMode ? "pointer" : "grab";
     
     const textContent = document.createElement("div");
     textContent.className = "textbox-content";
@@ -1118,6 +1212,13 @@ function restoreTextboxes() {
     textbox.addEventListener("dblclick", (e) => {
       e.stopPropagation();
       editTextbox(textboxData, textContent);
+    });
+    
+    // Add drag and drop listener for when NOT in textbox mode
+    textbox.addEventListener("mousedown", (e) => {
+      if (!isTextboxMode && !isEditingTextbox) {
+        startTextboxDrag(e, textboxData);
+      }
     });
     
     textLayer.appendChild(textbox);

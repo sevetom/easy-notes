@@ -337,7 +337,7 @@ body {
   background-color: transparent;
   border: 1px solid rgba(0, 0, 0, 0.5);
   box-sizing: border-box;
-  cursor: pointer;
+  cursor: grab;
   pointer-events: auto;
   display: flex;
   align-items: flex-start;
@@ -354,11 +354,20 @@ body {
 .textLayer .user-textbox.user-textbox-drawing {
   background-color: rgba(23, 162, 184, 0.05);
   border: 2px dashed rgba(23, 162, 184, 0.8);
+  cursor: crosshair;
 }
 
 .textLayer .user-textbox.editing {
   border-color: #17a2b8;
   box-shadow: 0 0 8px rgba(23, 162, 184, 0.5);
+  cursor: text;
+}
+
+.textLayer .user-textbox.dragging {
+  opacity: 0.8;
+  cursor: grabbing;
+  box-shadow: 0 4px 12px rgba(0, 123, 255, 0.5);
+  z-index: 1000;
 }
 
 .textbox-content {
