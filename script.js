@@ -27,6 +27,7 @@ const saveNotesBtn = document.getElementById("save-notes-btn");
 const loadNotesInput = document.getElementById("load-notes-input");
 const closeBtn = document.getElementById("close-btn");
 const filesInput = document.getElementById("files-input");
+const exportPdfBtn = document.getElementById("export-pdf-btn");
 
 // PDF elements
 const pdfViewer = document.getElementById("pdf-viewer");
@@ -2644,3 +2645,466 @@ window.addEventListener('beforeunload', function(event) {
   event.returnValue = confirmationMessage;
   return confirmationMessage;
 });
+
+// Export to PDF functionality
+exportPdfBtn.addEventListener("click", async () => {
+  if (!pdfDocument) {
+    alert("Please load a PDF first to export notes.");
+    return;
+  }
+
+  // Show loading indicator
+  exportPdfBtn.disabled = true;
+  exportPdfBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i><span class="d-none d-lg-inline">Exporting...</span>';
+
+  try {
+    await exportNotesToPDF();
+  } catch (error) {
+    console.error("Error exporting PDF:", error);
+    alert("Error exporting PDF: " + error.message);
+  } finally {
+    // Restore button
+    exportPdfBtn.disabled = false;
+    exportPdfBtn.innerHTML = '<i class="fas fa-file-export me-1"></i><span class="d-none d-lg-inline">Export PDF</span>';
+  }
+});
+
+async function exportNotesToPDF() {
+  const { jsPDF } = window.jspdf;
+  
+  // Create PDF in landscape orientation (A4: 297mm x 210mm)
+  const pdf = new jsPDF({
+    orientation: 'landscape',
+    unit: 'mm',
+    format: 'a4'
+  });
+
+  const pageWidth = pdf.internal.pageSize.getWidth();
+  const pageHeight = pdf.internal.pageSize.getHeight();
+  const margin = 10;
+  const dividerX = pageWidth / 2;
+
+  // Store original page and zoom
+  const originalPage = currentPage;
+  const originalZoom = currentZoom;
+
+  // Create a temporary off-screen canvas for rendering
+  const tempCanvas = document.createElement('canvas');
+  const tempContext = tempCanvas.getContext('2d');
+
+  // Process each page of the PDF
+  for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+    if (pageNum > 1) {
+      pdf.addPage();
+    }
+
+    // Add page number at the top
+    pdf.setFontSize(10);
+    pdf.setTextColor(100);
+    pdf.text(`Page ${pageNum}`, pageWidth / 2, margin - 3, { align: 'center' });
+
+    // Draw vertical divider line
+    pdf.setDrawColor(200);
+    pdf.line(dividerX, margin, dividerX, pageHeight - margin);
+
+    // LEFT SIDE: PDF Slide
+    try {
+      // Render page to temporary canvas (off-screen, no visual update)
+      const page = await pdfDocument.getPage(pageNum);
+      const viewport = page.getViewport({ scale: 1.5 }); // Good quality for export
+      
+      tempCanvas.width = viewport.width;
+      tempCanvas.height = viewport.height;
+
+      // Render the page on the temporary canvas
+      await page.render({
+        canvasContext: tempContext,
+        viewport: viewport
+      }).promise;
+
+      // Get the image data from temporary canvas
+      const imgData = tempCanvas.toDataURL('image/jpeg', 0.8);
+
+      // Calculate dimensions to fit in left half
+      const availableWidth = dividerX - (2 * margin);
+      const availableHeight = pageHeight - (2 * margin);
+
+      const canvasRatio = tempCanvas.width / tempCanvas.height;
+      let imgWidth = availableWidth;
+      let imgHeight = imgWidth / canvasRatio;
+
+      // If too tall, scale by height instead
+      if (imgHeight > availableHeight) {
+        imgHeight = availableHeight;
+        imgWidth = imgHeight * canvasRatio;
+      }
+
+      // Center the image in the left half
+      const imgX = margin + (availableWidth - imgWidth) / 2;
+      const imgY = margin + (availableHeight - imgHeight) / 2;
+
+      pdf.addImage(imgData, 'JPEG', imgX, imgY, imgWidth, imgHeight);
+    } catch (error) {
+      console.error(`Error rendering page ${pageNum}:`, error);
+      pdf.setFontSize(10);
+      pdf.setTextColor(150);
+      pdf.text(`Error loading slide ${pageNum}`, margin + 5, margin + 10);
+    }
+
+    // RIGHT SIDE: Notes
+    const noteText = notes[pageNum] || "";
+    
+    // Define text position constants (used in both if/else branches)
+    const textX = dividerX + margin;
+    const textY = margin + 5;
+    const textWidth = dividerX - (2 * margin);
+    const textMaxHeight = pageHeight - (2 * margin);
+    
+    if (noteText.trim()) {
+      // Render markdown to HTML
+      const htmlContent = marked.parse(noteText);
+      
+      // Convert HTML to structured content with formatting
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = htmlContent;
+      
+      // Render formatted markdown to PDF
+      let currentY = textY;
+      const maxY = pageHeight - margin;
+      
+      currentY = renderFormattedMarkdown(pdf, tempDiv, textX, currentY, textWidth, maxY);
+      
+      // Check if content was truncated
+      if (currentY >= maxY) {
+        pdf.setFontSize(9);
+        pdf.setTextColor(150);
+        pdf.text("...", textX, maxY - 2);
+      }
+    } else {
+      // No notes for this page
+      pdf.setFontSize(10);
+      pdf.setTextColor(150);
+      pdf.text("No notes for this page", textX, margin + 20);
+    }
+
+    // Progress update (ogni 10 pagine per ridurre overhead)
+    if (pageNum % 10 === 0 || pageNum === totalPages) {
+      exportPdfBtn.innerHTML = `<i class="fas fa-spinner fa-spin me-1"></i><span class="d-none d-lg-inline">Exporting ${pageNum}/${totalPages}...</span>`;
+      // Allow UI to update
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+  }
+
+  // Clean up temporary canvas
+  tempCanvas.remove();
+
+  // Restore original page (no need to re-render, just update state)
+  currentPage = originalPage;
+  currentZoom = originalZoom;
+
+  // Save the PDF
+  const filename = selectedFile + "_notes_export.pdf";
+  pdf.save(filename);
+
+  // Show success message
+  showExportConfirmation();
+}
+
+// Helper function to render formatted markdown content to PDF
+function renderFormattedMarkdown(pdf, element, startX, startY, maxWidth, maxY) {
+  let currentY = startY;
+  const lineSpacing = 1.2;
+  const paragraphSpacing = 3;
+  let listLevel = 0;
+  
+  // Helper to extract text with inline formatting as segments
+  function extractTextSegments(node, context = {}) {
+    const segments = [];
+    
+    function traverse(n, ctx) {
+      if (n.nodeType === Node.TEXT_NODE) {
+        const text = n.textContent;
+        if (text) {
+          segments.push({
+            text: text,
+            fontSize: ctx.fontSize || 10,
+            fontStyle: ctx.fontStyle || 'normal',
+            color: ctx.color || [0, 0, 0]
+          });
+        }
+      } else if (n.nodeType === Node.ELEMENT_NODE) {
+        const tagName = n.tagName.toLowerCase();
+        
+        switch (tagName) {
+          case 'strong':
+          case 'b':
+            for (const child of n.childNodes) {
+              traverse(child, { ...ctx, fontStyle: 'bold' });
+            }
+            break;
+          case 'em':
+          case 'i':
+            for (const child of n.childNodes) {
+              traverse(child, { ...ctx, fontStyle: 'italic' });
+            }
+            break;
+          case 'code':
+            for (const child of n.childNodes) {
+              traverse(child, { ...ctx, fontSize: 9, fontStyle: 'normal', color: [60, 60, 60] });
+            }
+            break;
+          case 'a':
+            for (const child of n.childNodes) {
+              traverse(child, { ...ctx, color: [0, 0, 255] });
+            }
+            const href = n.getAttribute('href');
+            if (href) {
+              segments.push({
+                text: ` (${href})`,
+                fontSize: 8,
+                fontStyle: 'normal',
+                color: [100, 100, 100]
+              });
+            }
+            break;
+          default:
+            for (const child of n.childNodes) {
+              traverse(child, ctx);
+            }
+        }
+      }
+    }
+    
+    traverse(node, context);
+    return segments;
+  }
+  
+  // Render text segments on the same line with different formatting
+  function renderTextSegments(segments, x, y, maxW, indent = 0) {
+    if (segments.length === 0) return y;
+    
+    let currentX = x + indent;
+    let currentLineY = y;
+    let maxFontSizeInLine = 10;
+    
+    for (const segment of segments) {
+      if (currentLineY >= maxY) break;
+      
+      pdf.setFontSize(segment.fontSize);
+      pdf.setFont('helvetica', segment.fontStyle);
+      pdf.setTextColor(segment.color[0], segment.color[1], segment.color[2]);
+      
+      maxFontSizeInLine = Math.max(maxFontSizeInLine, segment.fontSize);
+      
+      // Split text by newlines first
+      const lines = segment.text.split('\n');
+      
+      for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+        const lineText = lines[lineIdx];
+        
+        // If explicit newline, move to next line
+        if (lineIdx > 0) {
+          currentX = x + indent;
+          currentLineY += maxFontSizeInLine * lineSpacing / 2 + 1;
+          maxFontSizeInLine = segment.fontSize;
+        }
+        
+        const words = lineText.split(' ');
+        
+        for (let i = 0; i < words.length; i++) {
+          const word = words[i] + (i < words.length - 1 ? ' ' : '');
+          if (!word.trim() && i === words.length - 1) continue;
+          
+          const wordWidth = pdf.getTextWidth(word);
+          
+          // Check if word fits on current line
+          if (currentX + wordWidth > x + maxW && currentX > x + indent) {
+            // Move to next line
+            currentX = x + indent;
+            currentLineY += maxFontSizeInLine * lineSpacing / 2 + 1;
+            maxFontSizeInLine = segment.fontSize;
+          }
+          
+          if (currentLineY >= maxY) break;
+          
+          pdf.text(word, currentX, currentLineY);
+          currentX += wordWidth;
+        }
+      }
+    }
+    
+    // Return Y position after the last line (add line height)
+    return currentLineY + maxFontSizeInLine * lineSpacing / 2 + 1;
+  }
+  
+  function processNode(node, context = {}) {
+    if (currentY >= maxY) return; // Stop if we've reached the bottom
+    
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const tagName = node.tagName.toLowerCase();
+      
+      switch (tagName) {
+        case 'h1':
+          if (currentY > startY) currentY += paragraphSpacing + 1;
+          const h1Segments = extractTextSegments(node, { fontSize: 16, fontStyle: 'bold' });
+          if (h1Segments.length > 0) {
+            currentY = renderTextSegments(h1Segments, startX, currentY, maxWidth, 0);
+            currentY += 2;
+          }
+          break;
+          
+        case 'h2':
+          if (currentY > startY) currentY += paragraphSpacing + 1;
+          const h2Segments = extractTextSegments(node, { fontSize: 14, fontStyle: 'bold' });
+          if (h2Segments.length > 0) {
+            currentY = renderTextSegments(h2Segments, startX, currentY, maxWidth, 0);
+            currentY += 2;
+          }
+          break;
+          
+        case 'h3':
+          if (currentY > startY) currentY += paragraphSpacing;
+          const h3Segments = extractTextSegments(node, { fontSize: 12, fontStyle: 'bold' });
+          if (h3Segments.length > 0) {
+            currentY = renderTextSegments(h3Segments, startX, currentY, maxWidth, 0);
+            currentY += 1;
+          }
+          break;
+          
+        case 'h4':
+        case 'h5':
+        case 'h6':
+          if (currentY > startY) currentY += paragraphSpacing;
+          const hSegments = extractTextSegments(node, { fontSize: 11, fontStyle: 'bold' });
+          if (hSegments.length > 0) {
+            currentY = renderTextSegments(hSegments, startX, currentY, maxWidth, 0);
+          }
+          break;
+          
+        case 'p':
+          const pSegments = extractTextSegments(node, context);
+          if (pSegments.length > 0) {
+            currentY = renderTextSegments(pSegments, startX, currentY, maxWidth, context.indent || 0);
+          }
+          break;
+          
+        case 'br':
+          currentY += 4;
+          break;
+          
+        case 'strong':
+        case 'b':
+        case 'em':
+        case 'i':
+        case 'code':
+        case 'a':
+          // These are handled by extractTextSegments, skip individual processing
+          break;
+          
+        case 'ul':
+        case 'ol':
+          listLevel++;
+          const isOrdered = tagName === 'ol';
+          let itemNumber = 1;
+          
+          for (const child of node.childNodes) {
+            if (child.tagName && child.tagName.toLowerCase() === 'li') {
+              if (currentY >= maxY) break;
+              
+              const indent = listLevel * 5;
+              const bullet = isOrdered ? `${itemNumber}.` : '•';
+              
+              // Save the starting Y position for the bullet
+              const bulletY = currentY;
+              
+              pdf.setFontSize(10);
+              pdf.setFont('helvetica', 'normal');
+              pdf.setTextColor(0);
+              pdf.text(bullet, startX + indent - 3, bulletY);
+              
+              // Extract and render list item content
+              const liSegments = extractTextSegments(child, { ...context });
+              if (liSegments.length > 0) {
+                const newY = renderTextSegments(liSegments, startX, bulletY, maxWidth, indent + 2);
+                currentY = newY + 1; // Small spacing between list items
+              } else {
+                currentY += 5;
+              }
+              
+              itemNumber++;
+            }
+          }
+          
+          listLevel--;
+          if (listLevel === 0) {
+            currentY += 2; // Extra spacing after the entire list
+          }
+          break;
+          
+        case 'pre':
+          if (currentY > startY) currentY += 2;
+          pdf.setFont('courier', 'normal');
+          pdf.setFontSize(8);
+          pdf.setTextColor(60);
+          
+          const codeText = node.textContent;
+          const codeLines = pdf.splitTextToSize(codeText, maxWidth - 4);
+          
+          for (const line of codeLines) {
+            if (currentY >= maxY) break;
+            pdf.text(line, startX + 2, currentY);
+            currentY += 4;
+          }
+          
+          pdf.setFont('helvetica', 'normal');
+          pdf.setTextColor(0);
+          currentY += 2;
+          break;
+          
+        case 'blockquote':
+          if (currentY > startY) currentY += 2;
+          pdf.setDrawColor(150);
+          pdf.line(startX - 1, currentY - 2, startX - 1, currentY + 10);
+          const bqSegments = extractTextSegments(node, { ...context, fontSize: 9 });
+          currentY = renderTextSegments(bqSegments, startX, currentY, maxWidth - 5, 5);
+          currentY += 2;
+          break;
+          
+        case 'hr':
+          if (currentY > startY) currentY += 2;
+          pdf.setDrawColor(150);
+          pdf.line(startX, currentY, startX + maxWidth, currentY);
+          currentY += 3;
+          break;
+          
+        default:
+          // Process children for other elements
+          for (const child of node.childNodes) {
+            processNode(child, context);
+          }
+      }
+    }
+  }
+  
+  processNode(element);
+  return currentY;
+}
+
+// Show export confirmation message
+function showExportConfirmation() {
+  const confirmation = document.createElement('div');
+  confirmation.className = 'save-confirmation';
+  confirmation.innerHTML = '<i class="fas fa-check-circle me-2"></i>PDF exported successfully!';
+  document.body.appendChild(confirmation);
+
+  setTimeout(() => {
+    confirmation.classList.add('show');
+  }, 10);
+
+  setTimeout(() => {
+    confirmation.classList.remove('show');
+    setTimeout(() => {
+      document.body.removeChild(confirmation);
+    }, 300);
+  }, 2000);
+}

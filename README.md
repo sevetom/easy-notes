@@ -20,7 +20,8 @@ local storage or any form of auto-save.
 - 📄 Write markdown formatted notes with live preview
 - 🔍 Search for keywords across notes and PDF
 - 🎨 Highlight text directly in the PDF
-- 📱 Responsive design - works on desktop, tablet, and mobile
+- � **Export to PDF** - Create landscape PDFs with slides and notes side-by-side
+- �📱 Responsive design - works on desktop, tablet, and mobile
 - ⚡ Fast loading with multiple file selection
 - 🔄 Auto-sync between PDF pages and corresponding notes
 
@@ -73,6 +74,14 @@ A web page is also available at: [https://sevetom.github.io/easy-notes/](https:/
    - Click **Save** 💾 to download your notes as a .ezn file
    - The file will be named after your PDF (e.g., "document.ezn")
    - You can load this file later to continue working
+
+6. **Export to PDF** (New! 📄):
+   - Click **Export PDF** to create a comprehensive PDF document
+   - The exported PDF has **landscape orientation**
+   - Each page shows the **PDF slide on the left** and **notes on the right**
+   - All pages are included, even those without notes
+   - Markdown notes are automatically formatted in the export
+   - Perfect for sharing your annotated materials or printing
 
 ### 💡 Pro Tips
 
