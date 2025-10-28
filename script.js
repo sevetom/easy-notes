@@ -121,8 +121,6 @@ function saveNotesToLocalStorage() {
   try {
     const data = {
       notes: notes,
-      highlights: serializeHighlights(),
-      textboxes: serializeTextboxes(),
       totalPages: totalPages,
       lastPage: currentPage,
       selectedFile: selectedFile,
@@ -201,16 +199,6 @@ function loadNotesFromLocalStorage() {
       // Only load if there are actually notes to restore
       if (data.notes && Object.keys(data.notes).length > 0) {
         notes = data.notes;
-        
-        // Load highlights if available
-        if (data.highlights) {
-          highlights = deserializeHighlights(data.highlights);
-        }
-        
-        // Load textboxes if available
-        if (data.textboxes) {
-          textboxes = deserializeTextboxes(data.textboxes);
-        }
         
         // Restore other state if no PDF is loaded
         if (!pdfDocument) {
@@ -1971,16 +1959,6 @@ loadNotesInput.addEventListener("change", async () => {
           notes[pageNum] = data.notes[key];
         }
       });
-      
-      // Load highlights if available
-      if (data.highlights) {
-        highlights = deserializeHighlights(data.highlights);
-      }
-      
-      // Load textboxes if available
-      if (data.textboxes) {
-        textboxes = deserializeTextboxes(data.textboxes);
-      }
 
       // Set selectedFile name based on whether PDF is loaded
       if (pdfDocument) {
@@ -2043,8 +2021,6 @@ saveNotesBtn.addEventListener("click", () => {
 
   const data = {
     notes: notes,
-    highlights: serializeHighlights(),
-    textboxes: serializeTextboxes(),
     totalPages: totalPages,
     lastPage: currentPage,
     savedAt: new Date().toISOString(),
@@ -2240,16 +2216,6 @@ filesInput.addEventListener("change", async function () {
           }
         });
         
-        // Load highlights if available
-        if (data.highlights) {
-          highlights = deserializeHighlights(data.highlights);
-        }
-        
-        // Load textboxes if available
-        if (data.textboxes) {
-          textboxes = deserializeTextboxes(data.textboxes);
-        }
-        
         // Notes name already set before loading
         // (selectedFile was set from eznFile.name before clearAllNotes)
         
@@ -2309,16 +2275,6 @@ filesInput.addEventListener("change", async function () {
             notes[pageNum] = data.notes[key];
           }
         });
-        
-        // Load highlights if available
-        if (data.highlights) {
-          highlights = deserializeHighlights(data.highlights);
-        }
-        
-        // Load textboxes if available
-        if (data.textboxes) {
-          textboxes = deserializeTextboxes(data.textboxes);
-        }
         
         // Restore last page if available
         if (data.lastPage && data.lastPage <= totalPages) {
