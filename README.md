@@ -9,6 +9,8 @@ It allows you to view the PDF, take notes, and save or load them from a file.
 ## ⚠️ Use with caution
 This is a simple project made for personal use and learning purposes. It may contain bugs and is not intended for production use. Use at your own risk.
 
+Beware of the fact that is largely implemented by vibe coding.
+
 Always remember to save often your notes since the app does not use
 local storage or any form of auto-save.
 
